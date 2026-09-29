@@ -130,4 +130,35 @@ describe("grep tool", () => {
       ),
     ).rejects.toThrow(/do NOT treat this as zero matches/);
   });
+
+  it("every engine reads the pattern as rg/JS syntax: groups, alternation and \\d all MATCH", async () => {
+    const dir = fixture();
+    writeFileSync(join(dir, "src", "n.txt"), "port 8080\nno digits here\n");
+    const engines: Array<{ kind: string; bin: { kind: "rg" | "grep"; path: string } | null }> = [
+      { kind: "js", bin: null },
+    ];
+    for (const kind of ["rg", "grep"] as const) {
+      const path = findOnPath(kind);
+      if (path) engines.push({ kind, bin: { kind, path } });
+    }
+    const run = (pattern: string) =>
+      grepTool.run(
+        { pattern, path: "src", case_insensitive: false, max_matches: 50 },
+        { cwd: dir, sessionId: "t" },
+      );
+    try {
+      for (const e of engines) {
+        resetGrepBinaryCache(e.bin);
+        // basic-regex grep treated `|` and `(` as literals and returned zero matches
+        const alt = await run("(alpha|beta) =");
+        expect(alt.matches.map((m) => m.line).sort(), e.kind).toEqual([1, 3]);
+        expect(alt.matches.every((m) => m.file.endsWith("a.ts")), e.kind).toBe(true);
+        const digits = await run("port \\d+");
+        expect(digits.matches.map((m) => m.text), e.kind).toEqual(["port 8080"]);
+        await expect(run("(unclosed"), e.kind).rejects.toThrow();
+      }
+    } finally {
+      resetGrepBinaryCache();
+    }
+  });
 });

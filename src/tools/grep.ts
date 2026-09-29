@@ -59,10 +59,20 @@ function grepBinary(): GrepBinary | null {
   return resolvedBinary;
 }
 
-/** Test seam: forget the cached binary so the next call re-resolves. */
-export function resetGrepBinaryCache(): void {
-  resolvedBinary = undefined;
+/** Test seam: forget the cached binary so the next call re-resolves, or pin one engine (null = the JS walker). */
+export function resetGrepBinaryCache(force?: GrepBinary | null): void {
+  resolvedBinary = force;
 }
+
+/**
+ * The tool promises rg/JS regex syntax. GNU/BSD grep read patterns as BASIC
+ * regex by default, where `(`, `|` and `+` are literals, so `alpha|beta`
+ * silently matched nothing on any machine without ripgrep (the public CI
+ * caught it, 29 Sept 2026). `-E` covers groups and alternation; the syntax
+ * below has no ERE equivalent, so those patterns go to the JS walker, which
+ * IS JS syntax. A silent zero is never an acceptable answer.
+ */
+const NEEDS_JS_ENGINE = /\\[dD]|\(\?|[*+?}]\?/;
 
 // ─── pure-JS fallback ────────────────────────────────────────────────────
 
@@ -219,6 +229,12 @@ export const grepTool: Tool<In, GrepOut> = {
   async run(input, ctx) {
     const bin = grepBinary();
     if (!bin) return jsGrep(input, ctx.cwd);
+    if (bin.kind === "grep" && NEEDS_JS_ENGINE.test(input.pattern)) {
+      return {
+        ...jsGrep(input, ctx.cwd),
+        note: "built-in JS search: the pattern uses JS/rg syntax that grep -E cannot express (\\d, (?...), lazy quantifiers)",
+      };
+    }
 
     // `--` before the pattern on BOTH engines: a pattern like
     // `--file=/etc/shadow` must never be parsed as an option (the grep
@@ -241,6 +257,7 @@ export const grepTool: Tool<In, GrepOut> = {
             "--exclude-dir=.git",
             "--exclude-dir=node_modules",
             "--exclude-dir=dist",
+            "-E",
             ...(input.case_insensitive ? ["-i"] : []),
             "--",
             input.pattern,

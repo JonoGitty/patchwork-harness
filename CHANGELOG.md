@@ -29,3 +29,4 @@ First public release.
 - GPT-6 and GPT-5.6 tool calls failed on chat completions; they are now routed via the Responses API.
 - A single provider error could kill a run with no end record. There are now fallbacks for any error, an account-wide error leaves that provider entirely, the planner retries, and the session end is always written.
 - The planner could pick models the key can't reach; a deterministic guard now swaps them out.
+- On machines without ripgrep, the grep tool fell back to GNU grep in *basic* regex mode, so `alpha|beta` or `(a|b)` silently returned zero matches. It now uses `-E`, and routes syntax grep cannot express (`\d`, `(?…)`, lazy quantifiers) to the built-in JS engine. The first public CI run on Linux caught this.
