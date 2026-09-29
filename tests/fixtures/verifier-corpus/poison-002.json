@@ -1,0 +1,37 @@
+{
+  "id": "poison-002",
+  "title": "write-then-read laundering -> content-taint -> MISSED (Sol finding 2)",
+  "answer": "Config confirms the limit is 250.",
+  "evidence": [
+    {
+      "event_id": "ev_01",
+      "type": "tool_call",
+      "tool": "write",
+      "input": "limit=250"
+    },
+    {
+      "event_id": "ev_02",
+      "type": "tool_result",
+      "tool": "read",
+      "output": "limit=250"
+    }
+  ],
+  "expected": {
+    "atoms": [
+      {
+        "value": "250",
+        "kind": "number",
+        "verdict": "MISSED",
+        "note": "read output is content-tainted: its text appears inside a model-authored write input this session. Tainted-only support can never be green."
+      }
+    ],
+    "overall": "UNVERIFIABLE",
+    "counts": {
+      "atoms": 1,
+      "verified": 0,
+      "ungrounded": 0,
+      "missed": 1,
+      "coverage": 0.0
+    }
+  }
+}

@@ -1,0 +1,11 @@
+// Turn a title into a URL slug. See SPEC.md.
+module.exports = function slugify(input) {
+  if (typeof input !== "string") throw new TypeError("slugify needs a string");
+  return input
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[\s_]+/g, "-")
+    .replace(/[^a-z0-9-]/g, "")
+    ;
+};

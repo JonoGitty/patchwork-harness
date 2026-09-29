@@ -1,0 +1,12 @@
+const assert = require("assert");
+const parseDuration = require("./duration.js");
+assert.strictEqual(parseDuration("1h30m"), 5400);
+assert.strictEqual(parseDuration("45s"), 45);
+assert.strictEqual(parseDuration("1h 30m"), 5400);
+assert.strictEqual(parseDuration("90"), 90);
+assert.strictEqual(parseDuration("2H"), 7200);
+assert.strictEqual(parseDuration("30m1h"), 5400);
+assert.throws(() => parseDuration(""));
+assert.throws(() => parseDuration("5d"));
+assert.throws(() => parseDuration("-5s"));
+console.log("hidden check passed");

@@ -1,0 +1,29 @@
+{
+  "id": "url-001",
+  "title": "URL never fetched in session",
+  "answer": "Per https://example.com/docs/limits the cap is 100.",
+  "evidence": [
+    {
+      "event_id": "ev_01",
+      "type": "tool_result",
+      "tool": "bash",
+      "output": "cap=100"
+    }
+  ],
+  "expected": {
+    "atoms": [
+      {
+        "value": "https://example.com/docs/limits",
+        "kind": "url",
+        "verdict": "UNGROUNDED"
+      },
+      {
+        "value": "100",
+        "kind": "number",
+        "verdict": "VERIFIED",
+        "evidence": "ev_01"
+      }
+    ],
+    "overall": "NOT_GREEN"
+  }
+}

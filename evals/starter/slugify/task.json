@@ -1,0 +1,6 @@
+{
+  "goal": "Implement slugify in slug.js following SPEC.md.",
+  "verify": "node test.js",
+  "check": "node check.js",
+  "budget_usd": 0.3
+}

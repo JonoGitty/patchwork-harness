@@ -1,0 +1,663 @@
+# Model capabilities — the knowledge corpus the planner uses to route
+# work to the right specialist. The orchestrator's value is in DELEGATION:
+# the BEST-AVAILABLE model in each tier handles work in its sweet spot,
+# regardless of vendor.
+#
+# IMPORTANT: This file should NOT be biased toward any specific model.
+# It's biased toward TIERS:
+#   - flagship      — the current best for serious coding (whoever ships it)
+#   - workhorse     — fast/cheap-enough for the bulk
+#   - cheap_fast    — for coordination, classification, mechanical edits
+#   - reasoning     — slow but thorough thinking (algorithm correctness, security)
+#   - flagship_alt  — strong alternates for second-opinion / huge context
+#   - research      — live web with citations (no tools)
+#   - local         — free, private, on this laptop
+#
+# When a vendor ships a new model that beats the current flagship,
+# update this file: bump its `last_reviewed`, re-classify the affected
+# tier entries, and refresh `domain_routing.preferred_models`. The
+# planner picks BY TIER first; the named lists are just the current
+# best-in-tier shortlist. Models the key cannot reach right now are hidden
+# from the planner at run time (src/providers/availability.ts), so an entry
+# here for an unreleased model is harmless.
+#
+# Three things happen here:
+#   1. corpus_metadata — when this was last reviewed and by whom
+#   2. Per-model best_for / avoid_for / quirks / tier (capability profiles)
+#   3. domain_routing — maps a coding domain to its preferred TIER + the
+#      current best-in-tier models for that domain
+#   4. routing_heuristics + anti_patterns — guard-rails for the planner
+
+corpus_metadata:
+  last_reviewed: "2026-09-29"     # evidence-based refresh (docs/research/model-probe-2026-09-28.json): Opus 5.5, GPT-6 Sol/Luna and Grok 4.7 added and verified by a real call; opus-4-8 and gpt-5.6-terra dropped as dominated. Prior reviews 2026-09-07, 2026-08-12.
+  next_review_due: "2026-12-28"   # 3 months — model landscape moves fast; ALSO re-run scripts/probe_models.mjs whenever gpt-6 / gpt-6-pro / claude-mythos-5-1 are expected to unlock
+  review_policy: |
+    Refresh this corpus when ANY of these happen:
+      - A new flagship-tier model ships from any vendor.
+      - An existing model's pricing changes by >20%.
+      - You notice routing picks that feel "off" in audit logs.
+    On refresh: run scripts/probe_models.mjs (a listing is not proof - only a
+    real call is), take prices from the vendor pricing page or write
+    `unknown`, bump corpus_metadata.last_reviewed, update the affected model
+    entries, and re-shortlist domain_routing.preferred_models.
+    Stale corpus = biased routing toward last-reviewed-era models.
+
+models:
+  - id: claude-fable-5-1
+    tier: reasoning
+    speed: slow
+    relative_cost: very_high
+    best_for:
+      - "The hardest reasoning: adversarial security review, proofs, questions where Opus 5.5 still falls short - Anthropic's top reasoner (HLE 65.6%, vendor-reported)"
+      - "Security-sensitive code review as one of the `security_reviewer` lanes"
+      - "Whole-codebase reasoning with the 1M window"
+    avoid_for:
+      - "Routine coding - Opus 5.5 is 40% of the price and leads it on the vendor's coding benchmarks"
+      - "Bulk mechanical edits, classification, docs (10x+ overkill)"
+      - "Latency-sensitive loops - it is the slowest current model"
+    quirks:
+      - "Adaptive thinking always on; effort defaults to high"
+      - "Cache hits are 2.5% of input price - cache the system prompt on long reviews"
+      - "Same underlying model as Mythos 5.1, which is org-gated; nothing in a normal code review is dual-use gated, so Fable is the working lane"
+    typical_cost_per_step_usd: 0.07
+
+  - id: claude-mythos-5-1
+    tier: reasoning
+    speed: slow
+    relative_cost: very_high
+    best_for:
+      - "Fable 5.1 with fewer dual-use safeguards - offensive-security research that Fable declines"
+    avoid_for:
+      - "Anything Fable 5.1 already does (identical model, and this id is 404 on this key)"
+    quirks:
+      - "Org-gated 'limited availability'; probed each session and hidden until reachable"
+    typical_cost_per_step_usd: 0.07
+
+  - id: claude-opus-5-5
+    tier: flagship
+    speed: medium
+    relative_cost: high
+    best_for:
+      - "DEFAULT for serious coding (the executor role) - leads the vendor-reported coding/agent benchmarks: Terminal-Bench 4.0 66.4% (Astra 57.9%, Fable 5.1 55.8%, Opus 5 52.3%), FrontierCode 1.1 54.4%"
+      - "Long-horizon agent loops with many tools; 1M context, 128k output; very token-efficient"
+      - "Debugging subtle multi-file bugs; complex cross-file refactors and migrations"
+      - "Security-sensitive code when WRITING, with reasoning-tier reviewers from other vendors after"
+    avoid_for:
+      - "Bulk mechanical edits - Sonnet 5 is half the price and faster"
+      - "Classification, extraction - Haiku 4.5 or GPT-6 Luna"
+      - "The 'max' effort level - reported to over-think until it hits output limits on simple tasks (patchwork-harness sends no effort)"
+    quirks:
+      - "$4/$20 - cheaper than Opus 5 ($5/$25); cache hits bill at 0.05x ($0.20/M)"
+      - "Rejects `temperature` like the rest of the 5-series (verified 28 Sept 2026) - the adapter drops it"
+      - "Fast mode $8/$40 (research preview)"
+    typical_cost_per_step_usd: 0.028
+
+  - id: claude-opus-5
+    tier: flagship
+    speed: medium
+    relative_cost: high
+    best_for:
+      - "Same-tier fallback when Opus 5.5 is unavailable (the availability layer swaps to it on a 404)"
+    avoid_for:
+      - "Anything where Opus 5.5 is reachable - it is newer, stronger and 20% cheaper"
+    quirks:
+      - "$5/$25 - the Opus line has been this price since 4.5; the old $15/$75 table was wrong"
+      - "Newer tokenizer (4.7+) produces ~30% more tokens for the same text than Sonnet 4.6-era models"
+      - "Fast mode available at $10/$50 (research preview) when latency matters more than cost"
+    typical_cost_per_step_usd: 0.035
+
+  - id: claude-sonnet-5-5
+    tier: workhorse
+    speed: fast
+    relative_cost: medium
+    best_for:
+      - "The workhorse from 28 Sept 2026: same $2/$10 as Sonnet 5, 30%+ faster, and a vendor-reported Terminal-Bench 4.0 of 70.6% (above Opus 5.5's 66.4%)"
+      - "Well-scoped everyday coding, fixing bugs, mechanical refactors, tests, docs (Anthropic's own positioning)"
+      - "Agentic terminal work where Opus 5.5's depth is not needed"
+    avoid_for:
+      - "The hardest open-ended multi-file design work - Opus 5.5 / Fable 5.1 still lead GDPval-AA and long-horizon reasoning"
+    quirks:
+      - "availability: unverified until a real call succeeds on this key (the balance was empty on 29 Sept); hidden from the planner until then, with Sonnet 5 as the next in line"
+      - "Expected to reject `temperature` like the rest of the 5-series (inferred; the adapter drops it for claude-sonnet-5*)"
+    typical_cost_per_step_usd: 0.012
+
+  - id: claude-sonnet-5
+    tier: workhorse
+    speed: fast
+    relative_cost: medium
+    best_for:
+      - "Bulk coding — mass renames, mechanical refactors across many files"
+      - "Cheap fallback for coding when Opus 5.5 / Astra would be overkill"
+      - "Test writing where you need real understanding of the code"
+      - "Documentation generation (READMEs, API docs, code comments)"
+      - "DevOps/IaC (Terraform, GitHub Actions, Dockerfiles, shell scripts)"
+      - "Single-file edits and simple 2-3 file refactors"
+    avoid_for:
+      - "Security-sensitive code — use a flagship and a reasoning-tier reviewer (false economy to save here)"
+      - "Hard architectural decisions — promote to Opus 5.5"
+      - "Pure NLP tasks where Haiku would do (classification, extract)"
+    quirks:
+      - "$2/$10 with a 1M window - 'the best combination of speed and intelligence'"
+      - "Tool-use is well-tuned, parallel tool calls work"
+    typical_cost_per_step_usd: 0.014
+
+  - id: claude-haiku-4-5
+    tier: cheap_fast
+    speed: very_fast
+    relative_cost: low
+    best_for:
+      - "Planning — decomposing a goal into sub-steps (this is what patchwork-harness's planner uses it for)"
+      - "Classification ('which category is this in?')"
+      - "Extraction ('pull out all the dates from this text')"
+      - "Summarisation (single-doc summary)"
+      - "Yes/no boolean questions over text"
+      - "Generating simple structured outputs (JSON with 3-5 fields)"
+      - "Trivial mechanical coding (rename one var, format one file)"
+    avoid_for:
+      - "Production code — its code is correct but uninspired"
+      - "Sustained agent loops with many tools — loses the plot after ~5 turns"
+      - "Reasoning that needs more than a couple of inferential hops"
+      - "Anything security-sensitive"
+    quirks:
+      - "Surprisingly good at tool_use for a small model"
+      - "Cheapest reliable option in the Anthropic family; 200k window (the rest of the lineup is 1M)"
+    typical_cost_per_step_usd: 0.007
+
+  - id: gpt-6-astra
+    tier: flagship
+    speed: medium
+    relative_cost: very_high
+    best_for:
+      - "OpenAI's most capable model - 'built for the hardest end-to-end work'; the non-Claude flagship lane for hard coding and hard reasoning"
+      - "Security review as a `security_reviewer` lane (independent vendor to Fable/Opus)"
+      - "Second-opinion serious coding when you want a non-Claude voice; 1.05M context, 128k output"
+      - "Computer use / terminal agents (the GPT line's traditional lead)"
+    avoid_for:
+      - "Bulk mechanical work (GPT-6 Luna is 100x cheaper)"
+      - "Classification (GPT-6 Luna / Haiku)"
+      - "Anything Sonnet 5 or GPT-6 Sol does reliably for 5x less"
+    quirks:
+      - "This IS GPT-6 on this key: the bare `gpt-6` / `gpt-6-pro` ids 404 while `gpt-6-astra` answers (probe 7 Sept 2026)"
+      - "$10/$50 under 272k input tokens, $20/$75 above - the long-context tier is the trap on whole-repo prompts"
+      - "Works on chat completions (no Responses-API detour needed)"
+    typical_cost_per_step_usd: 0.07
+
+  - id: gpt-6-pro
+    tier: reasoning
+    speed: slow
+    relative_cost: very_high
+    best_for:
+      - "If/when reachable: the heaviest OpenAI reasoner for a deliberate security second opinion"
+    avoid_for:
+      - "Anything - it is 404 on this key and its price is unpublished; hidden until the probe passes"
+    quirks:
+      - "availability: unverified; price unknown - the executor cannot count its spend until a price is published"
+    typical_cost_per_step_usd: 0.10
+
+  - id: gpt-6
+    tier: flagship
+    speed: medium
+    relative_cost: very_high
+    best_for:
+      - "If/when reachable under the bare id: same role as gpt-6-astra"
+    avoid_for:
+      - "Anything while 404 on this key - use gpt-6-astra"
+    quirks:
+      - "availability: unverified; price unknown"
+    typical_cost_per_step_usd: 0.07
+
+  - id: gpt-6-sol
+    tier: flagship
+    speed: fast
+    relative_cost: medium
+    best_for:
+      - "The non-Claude flagship coder at workhorse price ($2/$10, Sonnet 5's price) - 'built to power complex coding and agentic workflows'; DeepSWE 68.8% (vendor-reported)"
+      - "Backend APIs, business logic, strict-schema codegen - strong native structured outputs"
+      - "A second vendor's voice on serious coding when Astra is overkill; bulk coding in the OpenAI ecosystem"
+    avoid_for:
+      - "The single hardest multi-file changes - Opus 5.5 / Astra lead it on FrontierCode (54.4% / 53.3% vs 49.3%)"
+      - "Classification (GPT-6 Luna is 20x cheaper)"
+    quirks:
+      - "OpenAI's mid-tier GPT-6 (below Astra); 1.05M context, 922k input cap, 128k output; reasoning effort none-max, default medium"
+      - "$2/$10 under 272k input, $4/$15 above"
+    typical_cost_per_step_usd: 0.014
+
+  - id: gpt-6-luna
+    tier: cheap_fast
+    speed: very_fast
+    relative_cost: very_low
+    best_for:
+      - "Cheapest capable model in the catalog ($0.10/$0.50): snippets, regex, command suggestions, JSON formatting, classification, extraction"
+      - "High-volume mechanical edits - vendor-reported DeepSWE 66.6%, far above its price class"
+    avoid_for:
+      - "Multi-step refactors and sustained reasoning - promote to GPT-6 Sol or a flagship"
+      - "Security or correctness-critical code"
+    quirks:
+      - "'Our most efficient model for focused, high-volume tasks'; 1.05M context; >272k input bills $0.20/$0.75"
+    typical_cost_per_step_usd: 0.001
+
+  - id: gpt-5.6-sol
+    tier: flagship
+    speed: fast
+    relative_cost: high
+    best_for:
+      - "Same-tier fallback when GPT-6 Sol is unavailable"
+    avoid_for:
+      - "Anything where GPT-6 Sol is reachable - newer at half the price"
+    quirks:
+      - "The estate's standing GPT security reviewer on 3 Sept 2026 (reasoning effort high); Astra now leads that lane"
+      - "$4/$20 under 272k input, $8/$30 above"
+    typical_cost_per_step_usd: 0.03
+
+  - id: gpt-5.6-luna
+    tier: cheap_fast
+    speed: very_fast
+    relative_cost: very_low
+    best_for:
+      - "Same-tier fallback when GPT-6 Luna is unavailable"
+    avoid_for:
+      - "Multi-step refactors"
+      - "Anything requiring sustained reasoning"
+      - "Security or correctness-critical code"
+    quirks:
+      - "'Optimized for cost-sensitive workloads'; 1.05M context even at this price"
+    typical_cost_per_step_usd: 0.002
+
+  - id: gpt-5.5
+    tier: flagship_alt
+    speed: fast
+    relative_cost: high
+    best_for:
+      - "Previous OpenAI flagship - CLI/terminal agents and computer use (Terminal-Bench / OSWorld leads at launch)"
+      - "Fallback when the 5.6/6 line is rate-limited"
+    avoid_for:
+      - "New work where GPT-6 Sol (cheaper) or Astra (stronger) is reachable"
+    quirks:
+      - "$5/$30 under 272k input, $10/$45 above"
+    typical_cost_per_step_usd: 0.04
+
+  - id: gpt-5.5-pro
+    tier: reasoning
+    speed: slow
+    relative_cost: very_high
+    best_for:
+      - "A deliberate, expensive second opinion on a hard security or algorithm question"
+    avoid_for:
+      - "Routine review (Astra at $50/M out is 3.6x cheaper); anything with tools in a loop"
+    quirks:
+      - "Responses API only - the adapter routes it there automatically; several seconds even for a 16-token reply"
+      - "$30/$180"
+    typical_cost_per_step_usd: 0.25
+
+  - id: gpt-5.4-mini
+    tier: cheap_fast
+    speed: very_fast
+    relative_cost: very_low
+    best_for:
+      - "Cheap OpenAI fallback for mechanical work when GPT-6 Luna is unavailable"
+    avoid_for:
+      - "Anything GPT-6 Luna does (newer and 7x cheaper)"
+    quirks:
+      - "$0.75/$4.50"
+    typical_cost_per_step_usd: 0.006
+
+  - id: o4-mini
+    tier: reasoning
+    speed: slow
+    relative_cost: medium
+    best_for:
+      - "Algorithmic correctness questions ('does this sort algorithm have an off-by-one?')"
+      - "Math problems where step-by-step reasoning matters"
+      - "Cheap reasoning-tier second opinion on logic flaws"
+    avoid_for:
+      - "Routine code generation (overkill, slow)"
+      - "Quick edits"
+    quirks:
+      - "Spends time thinking before responding — high latency"
+      - "Use to REVIEW code, not WRITE it"
+    typical_cost_per_step_usd: 0.008
+
+  - id: o3-pro
+    tier: reasoning
+    speed: slow
+    relative_cost: very_high
+    best_for:
+      - "Heavy algorithmic review when o4-mini is not enough and Astra is busy"
+    avoid_for:
+      - "Anything time-sensitive; anything a cheaper reasoner solves"
+    quirks:
+      - "Responses API only; 13s for 16 tokens; $20/$80"
+    typical_cost_per_step_usd: 0.12
+
+  - id: gemini-3.8-flash
+    tier: flagship
+    speed: very_fast
+    relative_cost: low
+    best_for:
+      - "DEFAULT Google-side flagship coder — Google's own line: 'long-horizon software engineering, autonomous agents, and complex enterprise workflows'"
+      - "Agentic loops where speed AND cost matter — $0.75/$3.75 (through 2026) is ~5x cheaper than Opus 5.5 per token"
+      - "Cost-sensitive but quality-critical coding; frontend/backend when you want a third flagship voice"
+      - "Multimodal-native coding inputs (UI screenshots → code, diagrams → code)"
+      - "Plan critique (the `critic` role) - an independent vendor checking Anthropic's planner"
+    avoid_for:
+      - "Pure bulk mechanical edits — GPT-6 Luna or 3.1 Flash-Lite is cheaper still"
+      - "The single hardest multi-file changes that must be right first time — promote to Opus 5.5 / Astra"
+    quirks:
+      - "1,048,576 in / 65,536 out (models endpoint, 7 Sept 2026)"
+      - "Gemini 3.x requires thought signatures echoed on every follow-up turn - the adapter does this since 7 Sept 2026 (it was a hard 400 before)"
+      - "Promotional price through 31 Dec 2026, then $1.50/$7.50"
+      - "Can do GROUNDED web research with real cited sources via `patchwork-harness ask --search` or \"grounded\": true on a gemini step. WITHOUT grounding it answers from training memory and WILL hallucinate citations"
+    typical_cost_per_step_usd: 0.006
+
+  - id: gemini-3.7-flash
+    tier: flagship
+    speed: very_fast
+    relative_cost: low
+    best_for:
+      - "Same-tier fallback for 3.8 Flash ('complex coding, agentic workflows, reliable multi-step execution')"
+    avoid_for:
+      - "Anything where 3.8 is reachable"
+    quirks:
+      - "Same price as 3.8"
+    typical_cost_per_step_usd: 0.006
+
+  - id: gemini-3.1-pro-preview
+    tier: reasoning
+    speed: medium
+    relative_cost: medium
+    best_for:
+      - "Google's heaviest reasoner - the third `security_reviewer` lane (independent of Anthropic and OpenAI) at $2/$12"
+      - "Whole-codebase analysis / cross-file audits needing 1M context with strong reasoning"
+      - "Second-opinion review of algorithm correctness outside the Claude/GPT ecosystem"
+      - "Complex multimodal reasoning (long video/PDF + code)"
+    avoid_for:
+      - "Routine code generation (3.8 Flash is faster and cheaper for similar coding quality)"
+      - "Tight high-volume agent loops"
+    quirks:
+      - "Preview id (gemini-3.1-pro-preview); expect churn until GA"
+      - "Tiered pricing: prompts > 200k input tokens bill at $4/M in, $18/M out (the adapter applies it)"
+      - "Use it to REVIEW/REASON; pair with 3.8 Flash or a flagship coder for the actual writing"
+    typical_cost_per_step_usd: 0.018
+
+  - id: gemini-3.1-flash-lite
+    tier: cheap_fast
+    speed: very_fast
+    relative_cost: very_low
+    best_for:
+      - "Cheapest current-gen Google model ($0.25/$1.50) — high-volume mechanical edits, classification, extraction"
+      - "Cheap multimodal jobs (image/video+text classification, OCR-like work)"
+    avoid_for:
+      - "Multi-step coding (promote to 3.8 Flash or a flagship)"
+      - "Correctness-critical or security work"
+    quirks:
+      - "Most cost-effective Gemini tier; multimodal-native; 1M window"
+    typical_cost_per_step_usd: 0.002
+
+  - id: grok-4.7
+    tier: flagship_alt
+    speed: fast
+    relative_cost: medium
+    best_for:
+      - "Recent/real-time web info — native X (Twitter) feed access nobody else has"
+      - "A fourth-vendor perspective in reviews when Claude/GPT/Gemini agree too readily"
+      - "Long-running work with self-verification (xAI's stated focus for 4.7)"
+    avoid_for:
+      - "Default coding tasks (Opus 5.5 / Astra / GPT-6 Sol / 3.8 Flash are better evidenced)"
+    quirks:
+      - "Released 22 Sept 2026; $2/$6 under 200k tokens, $4/$12 above; 500k window; OpenAI-compatible API"
+    typical_cost_per_step_usd: 0.01
+
+  - id: grok-4.6
+    tier: flagship_alt
+    speed: fast
+    relative_cost: medium
+    best_for:
+      - "Same-tier fallback when Grok 4.7 is unavailable (same price)"
+    avoid_for:
+      - "Default coding tasks (Opus 5.5 / Astra / GPT-6 Sol / 3.8 Flash are more reliable)"
+      - "Anything where consistency matters — verify factual/technical output"
+    quirks:
+      - "OpenAI-API-compatible; key is GROK_API_KEY or XAI_API_KEY"
+      - "$2/$6 under 200k tokens, $4/$12 above; 500k window"
+    typical_cost_per_step_usd: 0.01
+
+  - id: grok-4.3
+    tier: cheap_fast
+    speed: very_fast
+    relative_cost: very_low
+    best_for:
+      - "Cheap web-aware lookups; 1M window at $1.25/$2.50"
+    avoid_for:
+      - "Anything where GPT-6 Luna / Haiku / Flash-Lite would do (better tested)"
+    quirks:
+      - "OpenAI-compatible API — drops in cleanly"
+    typical_cost_per_step_usd: 0.004
+
+  - id: sonar-pro
+    tier: research
+    speed: fast
+    relative_cost: medium
+    best_for:
+      - "DEFAULT for web research — live search-grounded answers WITH citations/sources"
+      - "Current events, latest releases, 'what's the state of X right now' questions"
+      - "Fact-finding a coding step depends on (current API/library versions, breaking changes)"
+    avoid_for:
+      - "ANY coding/tool-execution step — Sonar has no reliable function calling; it cannot read/write/edit/bash"
+      - "Pure reasoning with no web need"
+    quirks:
+      - "RESEARCH-ONLY provider — the executor must not route tool-bearing steps here"
+      - "No key on this machine as of 7 Sept 2026 - hidden from the planner until one is set"
+      - "Token price excludes a per-request search fee"
+    typical_cost_per_step_usd: 0.01
+
+  - id: sonar
+    tier: research
+    speed: very_fast
+    relative_cost: low
+    best_for:
+      - "Cheap, quick web lookups with citations"
+    avoid_for:
+      - "Coding/tool steps (no function calling)"
+      - "Deep multi-source research (use sonar-pro or sonar-deep-research)"
+    quirks:
+      - "Cheapest Sonar tier; research-only"
+    typical_cost_per_step_usd: 0.003
+
+  - id: sonar-reasoning-pro
+    tier: research
+    speed: medium
+    relative_cost: medium
+    best_for:
+      - "Web research that needs synthesis/reasoning across sources, with citations"
+    avoid_for:
+      - "Coding/tool steps (no function calling)"
+    quirks:
+      - "Research-only; reasons over the retrieved sources before answering"
+    typical_cost_per_step_usd: 0.012
+
+  - id: sonar-deep-research
+    tier: research
+    speed: slow
+    relative_cost: high
+    best_for:
+      - "Long autonomous research reports — surveys a topic across many sources and writes it up with citations"
+    avoid_for:
+      - "Coding/tool steps (no function calling)"
+      - "Quick lookups (massively overkill and pricey)"
+    quirks:
+      - "Research-only; highest-cost Sonar — bills extra citation/reasoning tokens + search fees"
+    typical_cost_per_step_usd: 0.08
+
+  - id: gemma3:12b
+    tier: local
+    speed: medium
+    relative_cost: free
+    best_for:
+      - "PROSE. The strongest local writer this laptop runs: essays, notes, drafts, rewording, summaries of provided text, brainstorming"
+      - "Anything personal or sensitive — nothing leaves the machine"
+      - "Zero-cost bulk text generation when quality-per-dollar matters (it's free)"
+    avoid_for:
+      - "Hard reasoning, multi-file coding, agentic loops — flagships are far stronger"
+      - "Steps that must call tools (read/write/edit files) — Gemma 3 has NO tool-calling template; the executor degrades the step to pure text output"
+      - "Current/live information (no web access; use grounded gemini or sonar)"
+    quirks:
+      - "12B slightly exceeds the 8GB VRAM — Ollama splits GPU/CPU, so it's a bit slower than qwen3:8b but writes better"
+      - "Pattern: gemma3 drafts the text → a cheap cloud step (or qwen3:8b) files it"
+    typical_cost_per_step_usd: 0.0
+
+  - id: qwen3:8b
+    tier: local
+    speed: fast
+    relative_cost: free
+    best_for:
+      - "Local steps that need TOOL CALLING (write/edit files) at $0 — fits entirely in the 8GB GPU, fast"
+      - "Good-quality private writing/drafting when speed matters more than gemma3's prose polish"
+      - "Quick free classification/summarisation of local content"
+    avoid_for:
+      - "Hard reasoning and serious multi-file coding — use a flagship"
+      - "Current/live information (no web access)"
+    quirks:
+      - "Hybrid-thinking model — may emit a reasoning preamble before the answer; harmless but wordy"
+    typical_cost_per_step_usd: 0.0
+
+  - id: mistral-nemo
+    tier: local
+    speed: medium
+    relative_cost: free
+    best_for:
+      - "Natural, unstilted prose — a strong alternative voice to gemma3 for essays, fiction, letters, copy"
+      - "Long documents — 128k context, the largest of the local trio"
+      - "Local steps needing BOTH good writing and tool calling (qwen3 is faster but drier)"
+      - "Fully Apache-2.0 lineage with no vendor watermarking programme"
+    avoid_for:
+      - "Hard reasoning, multi-file coding — use a flagship"
+      - "Current/live information (no web access)"
+    quirks:
+      - "12B Q4 ≈ 7GB — mostly fits the 8GB GPU; slightly slower than qwen3:8b, comparable to gemma3:12b"
+    typical_cost_per_step_usd: 0.0
+
+# Domain routing — the heart of why this orchestrator exists.
+#
+# For each coding domain, the planner is told the PREFERRED TIER and the
+# current best-in-tier shortlist. The planner should pick by tier FIRST;
+# preferred_models is the current concrete shortlist as of corpus_metadata.
+# last_reviewed. If a newer flagship is added to models below, the planner
+# may pick it even if it's not in preferred_models.
+domain_routing:
+  frontend:
+    preferred_tier: flagship
+    preferred_models: [claude-opus-5-5, gemini-3.8-flash, gpt-6-sol]
+    cheap_fallback: [claude-sonnet-5, gpt-6-luna]
+    why: "React/Vue/CSS need design judgment + accessibility awareness + state-mgmt depth. Pick any flagship-tier coder; drop to workhorse only when the work is mechanical."
+
+  backend:
+    preferred_tier: flagship
+    preferred_models: [claude-opus-5-5, gpt-6-sol, gemini-3.8-flash]
+    cheap_fallback: [claude-sonnet-5, gpt-6-luna]
+    why: "API design, business logic, error-handling design — flagship-tier coders make better trade-offs. Drop to workhorse only for CRUD scaffolding."
+
+  security:
+    preferred_tier: reasoning
+    preferred_models: [gpt-6-astra, claude-fable-5-1, gemini-3.1-pro-preview, claude-opus-5-5]
+    cheap_fallback: []  # NO cheap fallback — security is false economy
+    why: "Auth, crypto, input validation, secrets handling — the cost of a bug dwarfs the cost of a flagship LLM call. WRITE with a flagship (Opus 5.5 / GPT-6 Sol), REVIEW with 2-3 reasoning-tier models from DIFFERENT vendors (`patchwork-harness review` does exactly this with the security_reviewer role), and never trust an absence claim ('X is missing') that the L4.5 verifier could not ground."
+
+  bulk_coding:
+    preferred_tier: workhorse
+    preferred_models: [claude-sonnet-5-5, claude-sonnet-5, gpt-6-sol]
+    cheap_fallback: [gpt-6-luna, gemini-3.1-flash-lite, claude-haiku-4-5]
+    why: "Mass renames, format-conversions, mechanical refactors — speed and cost dominate. Don't pay flagship prices for mechanical edits."
+
+  architectural:
+    preferred_tier: flagship
+    preferred_models: [claude-opus-5-5, gpt-6-astra, claude-fable-5-1]
+    cheap_fallback: []
+    why: "System design, large-scale migrations, cross-cutting refactors. Need a flagship-tier model with large context that holds the full picture in mind; promote to the reasoning tier when the decision is hard to reverse."
+
+  debugging:
+    preferred_tier: flagship
+    preferred_models: [claude-opus-5-5, claude-sonnet-5-5, gemini-3.8-flash, gpt-6-sol]
+    cheap_fallback: [claude-sonnet-5]
+    why: "Subtle bugs need state-reasoning across many files. Flagship-tier models connect more dots. Add a reasoning-tier model if the bug is logic/algorithmic."
+
+  testing:
+    preferred_tier: workhorse
+    preferred_models: [claude-sonnet-5-5, claude-sonnet-5, gemini-3.8-flash]
+    cheap_fallback: [gpt-6-luna]
+    why: "Workhorse writes good tests cheaply for typical paths. Promote to flagship when coverage matters or the SUT has subtle invariants. Reasoning tier for proving correctness."
+
+  algorithms:
+    preferred_tier: reasoning
+    preferred_models: [o4-mini, gemini-3.1-pro-preview, claude-fable-5-1, gpt-6-astra]
+    cheap_fallback: []
+    why: "Reasoning-tier model REVIEWS algorithm correctness; pair with a flagship-tier model for the actual implementation. No cheap fallback — wrong algorithms compound cost downstream."
+
+  devops_iac:
+    preferred_tier: workhorse
+    preferred_models: [claude-sonnet-5-5, claude-sonnet-5, gemini-3.8-flash]
+    cheap_fallback: [claude-haiku-4-5]
+    why: "Terraform/k8s/CI configs are pattern-heavy and well-served by workhorse. Promote to flagship for novel pipeline architecture."
+
+  data_engineering:
+    preferred_tier: flagship
+    preferred_models: [claude-opus-5-5, gpt-6-sol, claude-sonnet-5]
+    cheap_fallback: [gpt-6-luna]
+    why: "ETL design, complex SQL, schema design need flagship judgment. Cheap-fast OK for trivial pipeline glue."
+
+  docs:
+    preferred_tier: workhorse
+    preferred_models: [claude-sonnet-5-5, claude-sonnet-5, claude-haiku-4-5]
+    cheap_fallback: [gpt-6-luna]
+    why: "Documentation is mostly synthesis — workhorse has the right voice for READMEs; cheap-fast is fine for inline comments."
+
+  codebase_analysis:
+    preferred_tier: reasoning
+    preferred_models: [gemini-3.1-pro-preview, claude-opus-5-5, gpt-6-astra]
+    cheap_fallback: [gemini-3.8-flash]
+    why: "Reading and summarising whole codebases needs huge context + strong reasoning. Every current flagship has a ~1M window; prefer gemini-3.1-pro-preview for reasoning-per-dollar, 3.8 Flash when it must be fast and cheap. Page big files with read's offset/next_offset - never conclude from a truncated read."
+
+  writing:
+    preferred_tier: local
+    preferred_models: ["gemma3:12b", "mistral-nemo", "qwen3:8b"]
+    cheap_fallback: [claude-haiku-4-5]
+    why: "Prose, essays, notes, drafts, rewording, summaries of provided text. Local models are free and private — the right default on this laptop, and MANDATORY for personal/sensitive text. gemma3:12b writes best; qwen3:8b when the step must also call tools. Fall back to cloud only when the local provider is not live or the writing needs flagship-level reasoning."
+
+  web_research:
+    preferred_tier: research
+    preferred_models: [sonar-pro, sonar-reasoning-pro, sonar-deep-research]
+    cheap_fallback: [sonar, grok-4.7]
+    why: "Finding current/live information with sources. TWO grounded options: (a) Perplexity Sonar (purpose-built — sonar-pro default, sonar-reasoning-pro to synthesise sources, sonar-deep-research for long surveys), or (b) a gemini step with \"grounded\": true (live Google Search + citations, reuses GEMINI_API_KEY). If only the Google key is set (the case on this machine), use grounded gemini. NEVER route a step that must read/write/edit files or run commands here — research steps return cited text only; do the research step, THEN hand findings to a flagship coder."
+
+# Routing heuristics — guidance the planner injects into its decomposition
+# prompt. These speak in TIERS, not vendor names, so they stay correct
+# when new flagship models ship.
+routing_heuristics:
+  - "STEP 1: classify the step's domain (frontend/backend/security/bulk_coding/architectural/debugging/testing/algorithms/devops_iac/data_engineering/docs/codebase_analysis/writing/web_research). Then consult domain_routing for that domain's preferred_tier and preferred_models."
+  - "PICK BY TIER FIRST. preferred_models is the current shortlist as of corpus_metadata.last_reviewed; if the model registry has a newer flagship-tier coder not in that list, you may pick it instead."
+  - "ONLY pick models in the 'Available models' list you were given - it is already filtered to what this key can reach right now. A catalog entry hidden from that list is unreachable this session."
+  - "DO NOT be biased toward one vendor. If multiple flagship-tier models are available (Anthropic + OpenAI + Google), prefer the one whose strengths match the specific step. Mix vendors across a plan when each does its own piece best."
+  - "Default for 'write code that matters' is ANY flagship-tier coder — never default to a workhorse-tier model unless the step is bulk/mechanical/cheap-fallback."
+  - "If the goal mentions 'security', 'auth', 'crypto', 'sanitize', 'CSRF', 'XSS', 'SQL injection', 'review' — WRITE with a flagship, REVIEW with reasoning-tier models from different vendors. NEVER cheap-fallback security work, regardless of budget."
+  - "If the goal mentions 'rename', 'format', 'mass', 'across the codebase', 'bulk' — that's bulk_coding; use workhorse or cheap_fast tier."
+  - "If the goal mentions React/Vue/Svelte/CSS/component/UI — frontend; use a flagship-tier coder."
+  - "Plan with the cheapest reliable model (cheap_fast tier — typically Haiku — for the planner itself); EXECUTE with the right tier for each step."
+  - "Mix tiers within a plan — cheap_fast to classify, flagship to write hard code, workhorse for tests, cheap_fast for doc strings."
+  - "When budget is tight (<$0.20 total), drop flagships from non-critical steps but KEEP them for security and architectural steps. gemini-3.8-flash is the cheapest flagship-tier coder ($0.75/$3.75)."
+  - "For algorithm correctness, ALWAYS pair a reasoning-tier model (review) with a flagship-tier model (implementation)."
+  - "For web research / current info / 'what's the latest on X', route a dedicated research step to a research-tier model (Sonar) or a gemini step with grounded: true — never an ungrounded flagship."
+  - "Perplexity (sonar*) is RESEARCH-ONLY: it has NO tool calling. Never give it a step that reads/writes/edits files or runs commands."
+  - "When a coding step is cost-sensitive or high-throughput but still needs flagship quality, prefer gemini-3.8-flash; reserve Opus 5.5 / Astra for the hardest multi-file changes."
+  - "If the goal is writing/drafting prose (essay, notes, blog, letter, summary of provided text) and provider 'local' is live, route it to local tier ($0, private): gemma3:12b for pure text, qwen3:8b when the step must write files. This is MANDATORY for personal/sensitive text."
+  - "Code-review steps must READ the code before judging it: budget enough max_tool_turns (8-10) for paged reads and greps, and instruct the step to page big files with read offset/next_offset."
+
+anti_patterns:
+  - "Don't route hard reasoning or multi-file coding to local-tier models — they're for writing/drafting and private text, not serious engineering."
+  - "Don't default to a workhorse-tier model for serious coding — workhorse is the BULK/CHEAP tier here, not the default."
+  - "Don't use cheap_fast tier for production code — its code is correct but uninspired."
+  - "Don't use reasoning-tier models for code generation — use them to think about/review code."
+  - "Don't use flagship_alt models for tight agent loops — they're alternates and second opinions."
+  - "Don't use a flagship-tier model for a task that fits in 4K input tokens AND is mechanical — that's bulk; workhorse/cheap_fast wins."
+  - "Don't cheap-fallback security work — wrong trade-off; the cost of a bug dwarfs the cost of any single LLM call."
+  - "Don't pick a model whose provider isn't available in this environment (no API key) or that is hidden from the available list — the planner is told which models are live."
+  - "Don't be loyal to a vendor. The 'right' flagship today may be a different vendor tomorrow — pick by tier and per-step strengths, not by brand."
+  - "Don't let a reviewer report code as missing when its read was truncated or its grep engine failed — 'unknowable' is not 'absent'."

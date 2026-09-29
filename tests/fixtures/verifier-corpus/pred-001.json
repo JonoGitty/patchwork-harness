@@ -1,0 +1,24 @@
+{
+  "id": "pred-001",
+  "title": "same number, opposite predicate (Sol finding 4, conflict lexicon)",
+  "answer": "42 tests failed.",
+  "evidence": [
+    {
+      "event_id": "ev_01",
+      "type": "tool_result",
+      "tool": "bash",
+      "output": "42 tests passed"
+    }
+  ],
+  "expected": {
+    "atoms": [
+      {
+        "value": "42",
+        "kind": "number",
+        "verdict": "UNGROUNDED",
+        "note": "matched line says 'passed', sentence says 'failed' \u2014 frozen antonym lexicon conflict; claim-level atoms are v2"
+      }
+    ],
+    "overall": "NOT_GREEN"
+  }
+}

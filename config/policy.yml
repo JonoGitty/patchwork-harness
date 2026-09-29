@@ -1,0 +1,60 @@
+version: 1
+mode: fail-closed
+
+# Bash commands the executor may run without prompting.
+bash_allowlist:
+  - "ls *"
+  - "ls"
+  - "cat *"
+  - "echo *"
+  - "pwd"
+  - "which *"
+  - "node *"
+  - "python *"
+  - "python3 *"
+  - "pytest *"
+  - "npm *"
+  - "pnpm *"
+  - "yarn *"
+  - "git status*"
+  - "git diff*"
+  - "git log*"
+  - "git add*"
+  - "git commit*"
+  - "git checkout*"
+  - "git branch*"
+  - "git stash*"
+  - "mkdir *"
+  - "cp *"
+  - "mv *"
+
+# Bash commands the executor must never run, even with --auto.
+bash_denylist:
+  - "sudo *"
+  - "rm -rf *"
+  - "rm -r /*"
+  - "git push --force*"
+  - "chmod 777 *"
+  - "*| bash*"
+  - "*| sh*"
+  - "curl * | bash*"
+
+# Glob patterns for paths that are always refused (read or write).
+sensitive_paths:
+  - "**/.env"
+  - "**/.env.*"
+  - "**/id_rsa"
+  - "**/id_ed25519"
+  - "**/credentials.json"
+  - "**/.aws/**"
+  - "**/.ssh/**"
+  - "**/*secret*"
+  - "**/*credential*"
+
+prompt_for:
+  push: true                  # always confirm git push
+  pr: true                    # always confirm gh pr create/merge
+  bash_off_allowlist: true    # ask before running bash not on allowlist
+  write_outside_cwd: true     # ask before writing outside cwd
+
+max_budget_usd: 1.0           # default per-session cap

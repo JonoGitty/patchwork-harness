@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="Patchwork Harness icon">
+  <rect width="256" height="256" rx="40" fill="#14171c"/>
+  <g transform="translate(16 16)">
+    <rect x="0"   y="0"   width="108" height="108" rx="8" fill="#c8553d"/>
+    <rect x="116" y="0"   width="108" height="108" rx="8" fill="#2d6a73"/>
+    <rect x="0"   y="116" width="108" height="108" rx="8" fill="#e0a93b"/>
+    <rect x="116" y="116" width="108" height="108" rx="8" fill="#58406e"/>
+    <g stroke="#e8dcc4" stroke-width="2.5" stroke-dasharray="8 6" opacity="0.6">
+      <line x1="112" y1="6" x2="112" y2="218"/>
+      <line x1="6" y1="112" x2="218" y2="112"/>
+    </g>
+    <path d="M58 126 l30 30 l72 -80" fill="none" stroke="#f4efe6" stroke-width="18" stroke-linecap="round" stroke-linejoin="round" transform="translate(-4 -10)"/>
+  </g>
+</svg>

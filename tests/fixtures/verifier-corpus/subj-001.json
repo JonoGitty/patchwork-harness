@@ -1,0 +1,25 @@
+{
+  "id": "subj-001",
+  "title": "sentence-initial capitalised word must not restrict matching (field FP, 3x on 1 Sep)",
+  "answer": "Since the last check, spend was 527.22 this week.",
+  "evidence": [
+    {
+      "event_id": "ev_01",
+      "type": "tool_result",
+      "tool": "bash",
+      "output": "since=always\nspend=527.22"
+    }
+  ],
+  "expected": {
+    "atoms": [
+      {
+        "value": "527.22",
+        "kind": "number",
+        "verdict": "VERIFIED",
+        "evidence": "ev_01",
+        "note": "'Since' is sentence-initial capitalisation, not a subject; restricting to lines containing 'since' excluded the real evidence line three times in live firings (Done,/Since). Real subjects mid-sentence (mis-001's Alpha) still restrict."
+      }
+    ],
+    "overall": "GREEN"
+  }
+}

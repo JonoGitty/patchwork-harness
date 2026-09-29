@@ -1,0 +1,30 @@
+{
+  "id": "missed-001",
+  "title": "qualitative claim lands in MISSED, visibly \u2014 never dropped",
+  "answer": "All 42 tests passed and the test suite is comprehensive.",
+  "evidence": [
+    {
+      "event_id": "ev_01",
+      "type": "tool_result",
+      "tool": "bash",
+      "output": "42 tests passed"
+    }
+  ],
+  "expected": {
+    "atoms": [
+      {
+        "value": "42",
+        "kind": "number",
+        "verdict": "VERIFIED",
+        "evidence": "ev_01"
+      },
+      {
+        "value": "the test suite is comprehensive",
+        "kind": "qualitative",
+        "verdict": "MISSED",
+        "note": "no deterministic check exists; counted, reported, same prominence"
+      }
+    ],
+    "overall": "GREEN_WITH_MISSED"
+  }
+}

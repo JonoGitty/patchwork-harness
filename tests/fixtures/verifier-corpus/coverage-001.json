@@ -1,0 +1,66 @@
+{
+  "id": "coverage-001",
+  "title": "mostly-MISSED answer is not green (Sol finding 9)",
+  "answer": "Spend was 527.22. The migration is safe, robust, elegant, comprehensive, low-risk, scalable, and ready.",
+  "evidence": [
+    {
+      "event_id": "ev_01",
+      "type": "tool_result",
+      "tool": "bash",
+      "output": "spend=527.22"
+    }
+  ],
+  "expected": {
+    "atoms": [
+      {
+        "value": "527.22",
+        "kind": "number",
+        "verdict": "VERIFIED",
+        "evidence": "ev_01"
+      },
+      {
+        "value": "The migration is safe",
+        "kind": "qualitative",
+        "verdict": "MISSED"
+      },
+      {
+        "value": "robust",
+        "kind": "qualitative",
+        "verdict": "MISSED"
+      },
+      {
+        "value": "elegant",
+        "kind": "qualitative",
+        "verdict": "MISSED"
+      },
+      {
+        "value": "comprehensive",
+        "kind": "qualitative",
+        "verdict": "MISSED"
+      },
+      {
+        "value": "low-risk",
+        "kind": "qualitative",
+        "verdict": "MISSED"
+      },
+      {
+        "value": "scalable",
+        "kind": "qualitative",
+        "verdict": "MISSED"
+      },
+      {
+        "value": "ready",
+        "kind": "qualitative",
+        "verdict": "MISSED"
+      }
+    ],
+    "overall": "UNVERIFIABLE",
+    "counts": {
+      "atoms": 8,
+      "verified": 1,
+      "ungrounded": 0,
+      "missed": 7,
+      "coverage": 0.125
+    }
+  }
+}

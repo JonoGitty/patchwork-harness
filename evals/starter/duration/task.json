@@ -1,0 +1,6 @@
+{
+  "goal": "Implement parseDuration in duration.js: it turns strings like \"1h30m\" into a number of seconds. SPEC.md has the full rules.",
+  "verify": "node test.js",
+  "check": "node check.js",
+  "budget_usd": 0.3
+}

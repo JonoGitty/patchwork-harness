@@ -1,0 +1,28 @@
+{
+  "id": "str-id-001",
+  "title": "fabricated id and quoted string are tier-1 atoms (Sol finding 6)",
+  "answer": "Job abc123 failed with \"permission denied\".",
+  "evidence": [
+    {
+      "event_id": "ev_01",
+      "type": "tool_result",
+      "tool": "api",
+      "output": "job=def456 status=failed error=\"timeout\""
+    }
+  ],
+  "expected": {
+    "atoms": [
+      {
+        "value": "abc123",
+        "kind": "id",
+        "verdict": "UNGROUNDED"
+      },
+      {
+        "value": "permission denied",
+        "kind": "quoted_string",
+        "verdict": "UNGROUNDED"
+      }
+    ],
+    "overall": "NOT_GREEN"
+  }
+}

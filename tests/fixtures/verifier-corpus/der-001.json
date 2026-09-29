@@ -1,0 +1,42 @@
+{
+  "id": "der-001",
+  "title": "derived value WITH shown working \u2014 recomputable",
+  "answer": "Total cost was 0.0050 USD (0.0029 + 0.0021).",
+  "evidence": [
+    {
+      "event_id": "ev_01",
+      "type": "tool_result",
+      "tool": "api",
+      "output": "cost_usd=0.0029"
+    },
+    {
+      "event_id": "ev_02",
+      "type": "tool_result",
+      "tool": "api",
+      "output": "cost_usd=0.0021"
+    }
+  ],
+  "expected": {
+    "atoms": [
+      {
+        "value": "0.0050",
+        "kind": "number",
+        "verdict": "VERIFIED",
+        "evidence": "derivation:0.0029+0.0021"
+      },
+      {
+        "value": "0.0029",
+        "kind": "number",
+        "verdict": "VERIFIED",
+        "evidence": "ev_01"
+      },
+      {
+        "value": "0.0021",
+        "kind": "number",
+        "verdict": "VERIFIED",
+        "evidence": "ev_02"
+      }
+    ],
+    "overall": "GREEN"
+  }
+}

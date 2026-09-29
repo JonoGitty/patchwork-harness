@@ -1,0 +1,18 @@
+{
+  "id": "subj-002",
+  "title": "restriction must not hijack NON-number atoms (forge-a fixture B, field)",
+  "answer": "L1 — Project Awareness: before planning, assemble a \"world view\" packet (your memory files, project CLAUDE/README/ROADMAP, recent git, dashboard signal).",
+  "evidence": [
+    { "event_id": "ev_1", "type": "tool_result", "tool": "read",
+      "output": "- Each layer adds latency: world view assembly ~200ms, lessons ~100ms" },
+    { "event_id": "ev_2", "type": "tool_result", "tool": "read",
+      "output": "ROADMAP.md updated with Next-3" }
+  ],
+  "expected": {
+    "atoms": [
+      { "value": "world view", "kind": "quoted_string", "verdict": "VERIFIED", "evidence": "ev_1",
+        "note": "mid-sentence caps (ROADMAP) restricted matching away from the phrase's genuine evidence. v1.2: subject restriction applies to NUMBER atoms only — misattributed figures are what mis-001 guards; phrases carry no wrong-subject number risk." }
+    ],
+    "overall": "GREEN"
+  }
+}

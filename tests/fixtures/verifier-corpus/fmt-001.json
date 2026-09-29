@@ -1,0 +1,30 @@
+{
+  "id": "fmt-001",
+  "title": "formatting drift within frozen canonicalisation",
+  "answer": "Impressions came to 1,000 on 31 Aug 2026.",
+  "evidence": [
+    {
+      "event_id": "ev_01",
+      "type": "tool_result",
+      "tool": "bash",
+      "output": "impressions=1000 date=2026-08-31"
+    }
+  ],
+  "expected": {
+    "atoms": [
+      {
+        "value": "1,000",
+        "kind": "number",
+        "verdict": "VERIFIED",
+        "evidence": "ev_01"
+      },
+      {
+        "value": "31 Aug 2026",
+        "kind": "date",
+        "verdict": "VERIFIED",
+        "evidence": "ev_01"
+      }
+    ],
+    "overall": "GREEN"
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "goal": "Fix the bug described in ISSUE.md.",
+  "verify": "node test.js",
+  "check": "node check.js",
+  "budget_usd": 0.3
+}

@@ -1,0 +1,6 @@
+{
+  "goal": "Write sum.js so that `node sum.js <file.csv>` prints the total of the amount column. The format rules are in SPEC.md.",
+  "verify": "node test.js",
+  "check": "node check.js",
+  "budget_usd": 0.3
+}

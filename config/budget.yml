@@ -1,0 +1,34 @@
+# Multi-tier budget configuration.
+#
+# bedrock_usd is a HARD ceiling — never crossed under any circumstance.
+# session_usd is a SOFT cap — the planner targets this; mode controls
+# whether the executor lets it slip.
+# monthly_cap_usd is a defence-in-depth: if your aggregate spend across
+# all sessions in a calendar month hits this, patchwork-harness refuses new
+# sessions until the next month or you raise the cap.
+
+defaults:
+  bedrock_usd: 50.0      # never spend more than this in one session
+  session_usd: 1.0       # default target per session
+  mode: balanced         # budget | balanced | unlimited
+  monthly_cap_usd: 200.0 # soft cap aggregated across sessions
+
+# Per-mode behavioural hints — the planner reads these to bias model
+# selection. The executor enforces bedrock regardless of mode.
+modes:
+  # Model names refreshed 2026-09-28 against config/models.yml.
+  budget:
+    description: "Prefer the cheapest model that can do each step. Fewer steps. Wrap up fast. Flagships ONLY for security-sensitive steps (gemini-3.8-flash is the cheapest flagship-tier coder)."
+    prefer_models: [gemini-3.8-flash, gpt-6-luna, claude-sonnet-5, claude-haiku-4-5, gemini-3.1-flash-lite]
+    avoid_models: [claude-fable-5-1, gpt-6-astra, gpt-5.5-pro, o3-pro, gemini-3.1-pro-preview]
+    soft_overrun_pct: 0     # do not exceed session_usd
+  balanced:
+    description: "Flagship-first for serious coding (Opus 5.5 / GPT-6 Sol / Gemini 3.8 Flash). Sonnet 5 for bulk/mechanical. Cheap models for coordination/classification only. Reasoning tier (Fable 5.1 / Astra / 3.1 Pro) for security review."
+    prefer_models: [claude-opus-5-5, gpt-6-sol, gemini-3.8-flash, claude-sonnet-5, claude-haiku-4-5, gpt-6-luna]
+    avoid_models: []
+    soft_overrun_pct: 25    # may exceed session_usd by up to 25% — flagships cost more
+  unlimited:
+    description: "Pick the best model per step regardless of cost. Bedrock is the only cap."
+    prefer_models: [claude-opus-5-5, claude-fable-5-1, gpt-6-astra, gemini-3.8-flash, claude-sonnet-5]
+    avoid_models: []
+    soft_overrun_pct: 9999  # session_usd ignored; bedrock_usd is the cap

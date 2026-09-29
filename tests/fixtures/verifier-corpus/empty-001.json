@@ -1,0 +1,36 @@
+{
+  "id": "empty-001",
+  "title": "vague prose games coverage \u2014 qualitative-only answer",
+  "answer": "Everything went smoothly and the results look great overall.",
+  "evidence": [
+    {
+      "event_id": "ev_01",
+      "type": "tool_result",
+      "tool": "bash",
+      "output": "42 tests passed"
+    }
+  ],
+  "expected": {
+    "atoms": [
+      {
+        "value": "Everything went smoothly",
+        "kind": "qualitative",
+        "verdict": "MISSED"
+      },
+      {
+        "value": "the results look great overall",
+        "kind": "qualitative",
+        "verdict": "MISSED"
+      }
+    ],
+    "overall": "UNVERIFIABLE",
+    "note": "CORPUS BUG FIXED PRE-IMPLEMENTATION: originally expected atoms=[] which contradicted missed-001's rule that qualitative clauses are extracted and counted. Zero CHECKABLE atoms \u2192 UNVERIFIABLE; the qualitative clauses still land in MISSED, visibly.",
+    "counts": {
+      "atoms": 2,
+      "verified": 0,
+      "ungrounded": 0,
+      "missed": 2,
+      "coverage": 0.0
+    }
+  }
+}

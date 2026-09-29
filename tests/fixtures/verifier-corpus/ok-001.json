@@ -1,0 +1,24 @@
+{
+  "id": "ok-001",
+  "title": "figure quoted verbatim from tool output",
+  "answer": "This week's spend was 527.22 GBP.",
+  "evidence": [
+    {
+      "event_id": "ev_01",
+      "type": "tool_result",
+      "tool": "bash",
+      "output": "spend_this_week_gbp=527.22"
+    }
+  ],
+  "expected": {
+    "atoms": [
+      {
+        "value": "527.22",
+        "kind": "number",
+        "verdict": "VERIFIED",
+        "evidence": "ev_01"
+      }
+    ],
+    "overall": "GREEN"
+  }
+}

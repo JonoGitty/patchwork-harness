@@ -1,0 +1,30 @@
+{
+  "id": "poison-001",
+  "title": "self-citation: figure exists only in model-AUTHORED write input",
+  "answer": "As documented, the migration takes 45 minutes.",
+  "evidence": [
+    {
+      "event_id": "ev_01",
+      "type": "tool_call",
+      "tool": "write",
+      "input": "Migration guide: takes 45 minutes"
+    },
+    {
+      "event_id": "ev_02",
+      "type": "tool_result",
+      "tool": "bash",
+      "output": "migration completed"
+    }
+  ],
+  "expected": {
+    "atoms": [
+      {
+        "value": "45",
+        "kind": "number",
+        "verdict": "UNGROUNDED",
+        "note": "write-tool INPUT is model text \u2014 the generator must never cite itself"
+      }
+    ],
+    "overall": "NOT_GREEN"
+  }
+}

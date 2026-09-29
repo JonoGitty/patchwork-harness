@@ -1,0 +1,30 @@
+{
+  "id": "fmt-003",
+  "title": "numeric boundary and sign must not soften (Sol finding 5)",
+  "answer": "There were 6 conversions and the adjustment was -5.00.",
+  "evidence": [
+    {
+      "event_id": "ev_01",
+      "type": "tool_result",
+      "tool": "bash",
+      "output": "conversions=60\nadjustment=5.00\naccount=abc16"
+    }
+  ],
+  "expected": {
+    "atoms": [
+      {
+        "value": "6",
+        "kind": "number",
+        "verdict": "UNGROUNDED",
+        "note": "6 != 60, no substring match"
+      },
+      {
+        "value": "-5.00",
+        "kind": "number",
+        "verdict": "UNGROUNDED",
+        "note": "sign matters"
+      }
+    ],
+    "overall": "NOT_GREEN"
+  }
+}

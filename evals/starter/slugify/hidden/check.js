@@ -1,0 +1,10 @@
+const assert = require("assert");
+const slugify = require("./slug.js");
+assert.strictEqual(slugify("Hello World"), "hello-world");
+assert.strictEqual(slugify("Café au lait"), "cafe-au-lait");
+assert.strictEqual(slugify("  Trim  me  "), "trim-me");
+assert.strictEqual(slugify("snake_case_title"), "snake-case-title");
+assert.strictEqual(slugify("What?! No -- way..."), "what-no-way");
+assert.strictEqual(slugify("Über Straße 42"), "uber-strae-42");
+assert.throws(() => slugify(42), TypeError);
+console.log("hidden check passed");

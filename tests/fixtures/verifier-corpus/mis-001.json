@@ -1,0 +1,24 @@
+{
+  "id": "mis-001",
+  "title": "misattribution: real number, wrong subject (Sol finding 1 \u2014 was a FALSE GREEN)",
+  "answer": "Campaign Alpha spent 527.22 this week.",
+  "evidence": [
+    {
+      "event_id": "ev_01",
+      "type": "tool_result",
+      "tool": "bash",
+      "output": "campaign=Beta spend=527.22\ncampaign=Alpha spend=12.50"
+    }
+  ],
+  "expected": {
+    "atoms": [
+      {
+        "value": "527.22",
+        "kind": "number",
+        "verdict": "UNGROUNDED",
+        "note": "Sol r1: 'calling it a v1 limitation does not make it lawful'. Subject token 'Alpha' restricts matching to lines containing it; 527.22 lives only on the Beta line -> conflict -> UNGROUNDED. Full relational claims = v2."
+      }
+    ],
+    "overall": "NOT_GREEN"
+  }
+}

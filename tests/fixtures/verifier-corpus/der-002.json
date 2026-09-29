@@ -1,0 +1,30 @@
+{
+  "id": "der-002",
+  "title": "derived value WITHOUT working \u2014 asserted total",
+  "answer": "Total cost was 0.0050 USD.",
+  "evidence": [
+    {
+      "event_id": "ev_01",
+      "type": "tool_result",
+      "tool": "api",
+      "output": "cost_usd=0.0029"
+    },
+    {
+      "event_id": "ev_02",
+      "type": "tool_result",
+      "tool": "api",
+      "output": "cost_usd=0.0021"
+    }
+  ],
+  "expected": {
+    "atoms": [
+      {
+        "value": "0.0050",
+        "kind": "number",
+        "verdict": "UNGROUNDED",
+        "note": "sum appears in no output and no derivation was shown"
+      }
+    ],
+    "overall": "NOT_GREEN"
+  }
+}

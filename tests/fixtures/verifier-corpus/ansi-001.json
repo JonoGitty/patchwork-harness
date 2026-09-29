@@ -1,0 +1,25 @@
+{
+  "id": "ansi-001",
+  "title": "ANSI-decorated evidence must still ground atoms (field FP: vitest '115 passed')",
+  "answer": "The suite finished 115/115 green.",
+  "evidence": [
+    {
+      "event_id": "ev_1",
+      "type": "tool_result",
+      "tool": "bash",
+      "output": "\u001b[2m Tests \u001b[22m \u001b[1m\u001b[32m115 passed\u001b[39m"
+    }
+  ],
+  "expected": {
+    "atoms": [
+      {
+        "value": "115",
+        "kind": "number",
+        "verdict": "VERIFIED",
+        "evidence": "ev_1",
+        "note": "the colour code's trailing 'm' sat against the digits and the lookbehind rejected the number; evidence lines are ANSI-stripped at index time (v1.3)"
+      }
+    ],
+    "overall": "GREEN"
+  }
+}

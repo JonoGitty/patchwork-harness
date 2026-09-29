@@ -1,0 +1,54 @@
+{
+  "id": "recon-001",
+  "title": "mixed answer \u2014 partition must reconcile exactly",
+  "answer": "Spend was 527.22, ROI was 3.1x, and morale is high. See src/report.md.",
+  "evidence": [
+    {
+      "event_id": "ev_01",
+      "type": "tool_result",
+      "tool": "bash",
+      "output": "spend=527.22"
+    },
+    {
+      "event_id": "ev_02",
+      "type": "tool_result",
+      "tool": "glob",
+      "output": "src/report.md"
+    }
+  ],
+  "expected": {
+    "atoms": [
+      {
+        "value": "527.22",
+        "kind": "number",
+        "verdict": "VERIFIED",
+        "evidence": "ev_01"
+      },
+      {
+        "value": "3.1",
+        "kind": "number",
+        "verdict": "UNGROUNDED"
+      },
+      {
+        "value": "src/report.md",
+        "kind": "path",
+        "verdict": "VERIFIED",
+        "evidence": "ev_02"
+      },
+      {
+        "value": "morale is high",
+        "kind": "qualitative",
+        "verdict": "MISSED"
+      }
+    ],
+    "overall": "NOT_GREEN",
+    "note": "4 atoms = 2 green + 1 not-green + 1 missed; any other total = verifier INVALID",
+    "counts": {
+      "atoms": 4,
+      "verified": 2,
+      "ungrounded": 1,
+      "missed": 1,
+      "coverage": 0.75
+    }
+  }
+}

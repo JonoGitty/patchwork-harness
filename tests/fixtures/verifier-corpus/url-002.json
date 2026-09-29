@@ -1,0 +1,30 @@
+{
+  "id": "url-002",
+  "title": "URL mentioned in bash output is not proof it was fetched (Sol finding 7)",
+  "answer": "Per https://example.com/docs/limits the cap is 100.",
+  "evidence": [
+    {
+      "event_id": "ev_01",
+      "type": "tool_result",
+      "tool": "bash",
+      "output": "TODO: check https://example.com/docs/limits\ncap=100"
+    }
+  ],
+  "expected": {
+    "atoms": [
+      {
+        "value": "https://example.com/docs/limits",
+        "kind": "url",
+        "verdict": "UNGROUNDED",
+        "note": "URLs verify only from fetching-tool results (web/api/fetch/http)"
+      },
+      {
+        "value": "100",
+        "kind": "number",
+        "verdict": "VERIFIED",
+        "evidence": "ev_01"
+      }
+    ],
+    "overall": "NOT_GREEN"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "id": "fab-001",
+  "title": "fabricated currency amount (the \u00a3398.19 incident)",
+  "answer": "The account spent \u00a3398.19 this week with 6 conversions recorded.",
+  "evidence": [
+    {
+      "event_id": "ev_01",
+      "type": "tool_result",
+      "tool": "bash",
+      "output": "spend_this_week_gbp=527.22\nconversions=5"
+    }
+  ],
+  "expected": {
+    "atoms": [
+      {
+        "value": "\u00a3398.19",
+        "kind": "number",
+        "verdict": "UNGROUNDED"
+      },
+      {
+        "value": "6",
+        "kind": "number",
+        "verdict": "UNGROUNDED"
+      }
+    ],
+    "overall": "NOT_GREEN"
+  }
+}

@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="360" viewBox="0 0 1280 360" role="img" aria-label="Patchwork Harness: the verifying harness for AI coding agents">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#14171c"/>
+      <stop offset="1" stop-color="#1c2129"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="360" fill="url(#bg)"/>
+
+  <!-- the quilt: patches of work, each one checked -->
+  <g transform="translate(64 60)">
+    <rect x="0"   y="0"   width="112" height="112" rx="6" fill="#c8553d"/>
+    <rect x="120" y="0"   width="112" height="112" rx="6" fill="#2d6a73"/>
+    <rect x="0"   y="120" width="112" height="112" rx="6" fill="#e0a93b"/>
+    <rect x="120" y="120" width="112" height="112" rx="6" fill="#58406e"/>
+    <!-- stitches along every seam -->
+    <g stroke="#e8dcc4" stroke-width="2" stroke-dasharray="7 5" opacity="0.55">
+      <line x1="116" y1="6" x2="116" y2="226"/>
+      <line x1="6" y1="116" x2="226" y2="116"/>
+    </g>
+    <!-- the harness: a check on each patch -->
+    <g fill="none" stroke="#f4efe6" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M30 58 l18 18 l34 -38"/>
+      <path d="M150 58 l18 18 l34 -38"/>
+      <path d="M30 178 l18 18 l34 -38"/>
+      <path d="M150 178 l18 18 l34 -38"/>
+    </g>
+  </g>
+
+  <!-- wordmark -->
+  <g font-family="ui-sans-serif, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+    <text x="360" y="150" fill="#f4efe6" font-size="68" font-weight="700" letter-spacing="-1">Patchwork Harness</text>
+    <text x="362" y="200" fill="#b9c2cf" font-size="26">The verifying harness for AI coding agents.</text>
+    <text x="362" y="252" fill="#8b95a3" font-size="20">Test gates · independent review · grounded answers · every action audited</text>
+    <g font-size="17" fill="#e0a93b" font-family="ui-monospace, 'Cascadia Code', Menlo, Consolas, monospace">
+      <text x="362" y="298">$ patchwork-harness run "fix the bug" --verify-cmd "npm test" --attempts 3 --review</text>
+    </g>
+  </g>
+</svg>

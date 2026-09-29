@@ -1,0 +1,37 @@
+{
+  "id": "subj-003",
+  "title": "subject restriction needs a COMPETING figure to fire (field FP #4: 'Stop hook')",
+  "answer": "The suite is 115/115 green and every session's Stop hook runs the new build.",
+  "evidence": [
+    {
+      "event_id": "ev_1",
+      "type": "tool_result",
+      "tool": "bash",
+      "output": "\u001b[2m Tests \u001b[22m \u001b[1m\u001b[32m115 passed\u001b[39m\u001b[90m (115)\u001b[39m"
+    },
+    {
+      "event_id": "ev_2",
+      "type": "tool_result",
+      "tool": "read",
+      "output": "the Stop hook writes to the log"
+    }
+  ],
+  "expected": {
+    "atoms": [
+      {
+        "value": "115",
+        "kind": "number",
+        "verdict": "VERIFIED",
+        "evidence": "ev_1",
+        "note": "'Stop' restricted matching to a prose line holding NO numbers at all \u2014 that is not a competing subject table, it is a mention. v1.4: restriction fires only when the restricted set contains a same-kind atom with a DIFFERENT value (mis-001's 12.50)."
+      },
+      {
+        "value": "115",
+        "kind": "number",
+        "verdict": "VERIFIED",
+        "evidence": "ev_1"
+      }
+    ],
+    "overall": "GREEN"
+  }
+}
