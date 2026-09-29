@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640" role="img" aria-label="Patchwork Harness: the verifying harness for AI coding agents">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#14171c"/>
+      <stop offset="1" stop-color="#1c2129"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="640" fill="url(#bg)"/>
+
+  <!-- the quilt: patches of work, each one checked -->
+  <g transform="translate(96 150)">
+    <rect x="0"   y="0"   width="164" height="164" rx="9" fill="#c8553d"/>
+    <rect x="176" y="0"   width="164" height="164" rx="9" fill="#2d6a73"/>
+    <rect x="0"   y="176" width="164" height="164" rx="9" fill="#e0a93b"/>
+    <rect x="176" y="176" width="164" height="164" rx="9" fill="#58406e"/>
+    <g stroke="#e8dcc4" stroke-width="3" stroke-dasharray="10 7" opacity="0.55">
+      <line x1="170" y1="8" x2="170" y2="332"/>
+      <line x1="8" y1="170" x2="332" y2="170"/>
+    </g>
+    <g fill="none" stroke="#f4efe6" stroke-width="13" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M44 86 l26 26 l50 -56"/>
+      <path d="M220 86 l26 26 l50 -56"/>
+      <path d="M44 262 l26 26 l50 -56"/>
+      <path d="M220 262 l26 26 l50 -56"/>
+    </g>
+  </g>
+
+  <g font-family="ui-sans-serif, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+    <text x="512" y="262" fill="#f4efe6" font-size="76" font-weight="700" letter-spacing="-1.5">Patchwork</text>
+    <text x="512" y="342" fill="#f4efe6" font-size="76" font-weight="700" letter-spacing="-1.5">Harness</text>
+    <text x="514" y="400" fill="#b9c2cf" font-size="28">The verifying harness for AI coding agents.</text>
+    <text x="514" y="446" fill="#8b95a3" font-size="21">Test gates · independent review · grounded answers</text>
+    <text x="514" y="476" fill="#8b95a3" font-size="21">Every action on the Patchwork audit trail</text>
+  </g>
+  <text x="96" y="586" fill="#e0a93b" font-size="20" font-family="ui-monospace, 'Cascadia Code', Menlo, Consolas, monospace">github.com/JonoGitty/patchwork-harness</text>
+  <text x="1184" y="586" fill="#6b7482" font-size="18" text-anchor="end" font-family="ui-sans-serif, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">Part of the Patchwork suite</text>
+</svg>
