@@ -41,7 +41,12 @@ export interface SystemOneResponse {
 }
 
 export interface ClassifierConfig {
-  backend: "jev" | "kev";
+  /**
+   * jev: TypeSafe's hosted model. kev: jaredpalmer/kev served locally.
+   * jeff: firelex/jeff served locally (`jeff-serve`): Jev-compatible, with
+   * LoRA adapters chosen per request by model name (ADR-0013, 1 Oct 2026).
+   */
+  backend: "jev" | "kev" | "jeff";
   url: string; // base, without /v1/systemone
   model: string;
   apiKey?: string;
@@ -54,13 +59,25 @@ export const JEV_URL = "https://api.typesafe.ai";
  * otherwise TYPESAFE_API_KEY selects hosted Jev; otherwise none.
  */
 export function classifierConfig(env: NodeJS.ProcessEnv = process.env): ClassifierConfig | null {
+  const clean = (u: string) => u.replace(/\/+$/, "").replace(/\/v1\/systemone$/, "");
   const url = env.PATCHWORK_HARNESS_CLASSIFIER_URL?.trim();
   if (url) {
+    const backend = env.PATCHWORK_HARNESS_CLASSIFIER_BACKEND?.trim() === "jeff" ? "jeff" : "kev";
     return {
-      backend: "kev",
-      url: url.replace(/\/+$/, "").replace(/\/v1\/systemone$/, ""),
-      model: env.PATCHWORK_HARNESS_CLASSIFIER_MODEL?.trim() || "kev-latest",
+      backend,
+      url: clean(url),
+      model:
+        env.PATCHWORK_HARNESS_CLASSIFIER_MODEL?.trim() || (backend === "jeff" ? "jeff-latest" : "kev-latest"),
       apiKey: env.PATCHWORK_HARNESS_CLASSIFIER_KEY?.trim() || undefined,
+    };
+  }
+  const jeff = env.PATCHWORK_HARNESS_JEFF_URL?.trim();
+  if (jeff) {
+    return {
+      backend: "jeff",
+      url: clean(jeff),
+      model: env.PATCHWORK_HARNESS_CLASSIFIER_MODEL?.trim() || "jeff-latest",
+      apiKey: env.PATCHWORK_HARNESS_JEFF_KEY?.trim() || undefined,
     };
   }
   const key = env.TYPESAFE_API_KEY?.trim();
@@ -86,6 +103,10 @@ export class ClassifierError extends Error {
 }
 
 export interface AskOptions {
+  /** Per-call model: a Jeff adapter ("guard", "ground", ...) or the base. Default: cfg.model. */
+  model?: string;
+  /** Jeff: 2 answers twice with the options reversed and averages (removes position bias; 2x cost). */
+  orders?: 1 | 2;
   timeoutMs?: number;
   /** extra attempts on 429/529 (TypeSafe's documented back-off codes) */
   retries?: number;
@@ -114,18 +135,64 @@ function checkReply(body: unknown, questions: Record<string, Question>): SystemO
   return r;
 }
 
+/**
+ * A local model server (Jeff, Kev) runs one decision at a time: Jeff answers
+ * a second, overlapping request with 529 "The model is busy" (Retry-After: 1)
+ * instead of queueing it. So calls from this process to the same local URL
+ * go through one queue; only other processes can still collide, and those
+ * collisions are retried on the server's Retry-After (1 Oct 2026: an eval at
+ * parallel 2 lost 100 of 287 decisions to 529s before this).
+ */
+const localQueues = new Map<string, Promise<unknown>>();
+function queued<T>(key: string, fn: () => Promise<T>): Promise<T> {
+  const prev = localQueues.get(key) ?? Promise.resolve();
+  const run = prev.then(fn, fn);
+  localQueues.set(
+    key,
+    run.then(
+      () => undefined,
+      () => undefined,
+    ),
+  );
+  return run;
+}
+
+/** Seconds from a Retry-After header, capped; undefined when absent or not a number. */
+export function retryAfterMs(res: Response, capMs = 5_000): number | undefined {
+  const v = res.headers?.get?.("retry-after");
+  if (!v) return undefined;
+  const s = Number(v);
+  return Number.isFinite(s) && s >= 0 ? Math.min(s * 1000, capMs) : undefined;
+}
+
 export async function askSystemOne(
   cfg: ClassifierConfig,
   state: unknown,
   questions: Record<string, Question>,
   opts: AskOptions = {},
 ): Promise<SystemOneResponse> {
+  if (cfg.backend === "jev") return askOnce(cfg, state, questions, opts);
+  return queued(cfg.url, () => askOnce(cfg, state, questions, opts));
+}
+
+async function askOnce(
+  cfg: ClassifierConfig,
+  state: unknown,
+  questions: Record<string, Question>,
+  opts: AskOptions,
+): Promise<SystemOneResponse> {
   const doFetch = opts.fetchImpl ?? fetch;
   const retries = opts.retries ?? 3;
   const backoff = opts.backoffMs ?? 250;
   const headers: Record<string, string> = { "content-type": "application/json" };
   if (cfg.apiKey) headers.authorization = `Bearer ${cfg.apiKey}`;
-  const body = JSON.stringify({ state, model: cfg.model, questions });
+  // `orders` only when asked for: Jev and Kev may reject a field they don't know
+  const body = JSON.stringify({
+    state,
+    model: opts.model ?? cfg.model,
+    questions,
+    ...(opts.orders === 2 ? { orders: 2 } : {}),
+  });
 
   for (let attempt = 0; ; attempt++) {
     let res: Response;
@@ -142,7 +209,9 @@ export async function askSystemOne(
       );
     }
     if ((res.status === 429 || res.status === 529) && attempt < retries) {
-      await new Promise((r) => setTimeout(r, backoff * 2 ** attempt));
+      // the server's own hint wins over our back-off (Jeff sends Retry-After: 1)
+      const wait = Math.max(backoff * 2 ** attempt, retryAfterMs(res) ?? 0);
+      await new Promise((r) => setTimeout(r, wait));
       continue;
     }
     if (!res.ok) {

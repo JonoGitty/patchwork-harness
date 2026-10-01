@@ -474,7 +474,7 @@ export async function handle(msg: Json): Promise<Json | null> {
       return reply({
         protocolVersion: typeof asked === "string" ? asked : PROTOCOL,
         capabilities: { tools: {} },
-        serverInfo: { name: "patchwork-harness", version: "0.1.0" },
+        serverInfo: { name: "patchwork-harness", version: "0.2.0" },
         instructions:
           "patchwork-harness is a Patchwork-audited multi-LLM coding harness. Plan with harness_plan and show the user before harness_run (which needs confirm: true and spends money). Use harness_verify_claude to audit a Claude session's answer against its tool outputs.",
       });

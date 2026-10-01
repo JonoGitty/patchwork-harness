@@ -21,6 +21,7 @@ Patchwork Harness runs your coding agent inside a loop that **checks the work in
 - **Independent review.** A model from a *different vendor* reviews the finished diff read-only against a rubric — every concern must quote evidence.
 - **Grounded answers.** A deterministic verifier checks every number, path and quote in the agent's final answer against what its tools actually returned. Its law: **never a false VERIFIED.**
 - **Multi-vendor routing.** Plans are routed step by step across Claude, GPT, Gemini, Grok and local models, by tier and evidence — not by brand.
+- **Small, fast classifiers, measured first.** Local [Jeff](https://github.com/firelex/jeff) "System 1" models screen tool output for prompt injection and triage claims the verifier can't check, in tens of milliseconds. Each is scored against a constant baseline before anything in the harness trusts it.
 - **Audited, budgeted, undoable.** Every action lands on the [Patchwork](https://github.com/JonoGitty/patchwork-audit) audit trail, a hard spend ceiling is never crossed, and `--checkpoint` makes any run rewindable.
 
 Part of the **Patchwork suite**: [patchwork-audit](https://github.com/JonoGitty/patchwork-audit) records what agents do; **patchwork-harness** makes sure what they do is done well.
@@ -80,7 +81,25 @@ The independent reviewer agreed with the hidden check on **15 / 16** runs and fl
 | gpt-6-sol | 8 / 8 | 3 / 4 | 0.014 |
 | gpt-6-luna | 7 / 8 | 3 / 4 | 0.0007 |
 
-Small samples — the direction matches published harness research, the evidence is honestly thin. Run your own: `patchwork-harness eval run starter --configs baseline,gate,gate+review --trials 4`.
+Small samples. The direction matches published harness research, but the evidence is honestly thin. Run your own: `patchwork-harness eval run starter --configs baseline,gate,gate+review --trials 4`.
+
+**Skipping the planner on one-pass jobs** (`--lane direct`). The planner splits every job into about 3 steps of 5 tool turns each. On jobs that don't need that, one direct step does better. Same model (GPT-6 Sol), same build, 16 runs per arm:
+
+| Arm | Passed hidden check | Median time | Input tokens | Cost at equal prices |
+|---|---|---|---|---|
+| Planned pipeline | 8 / 16 | 61.5 s | 43.9K | $0.264 |
+| `--lane direct` | **16 / 16** | **42.2 s** | **16.3K** | **$0.090** |
+
+Across three evals the saving held every time: 46–63% fewer tokens and 30–49% less time. Pass rates swung with day-to-day model variance, so read the quality result as "no worse".
+
+**Classifiers, scored before they're trusted** (`patchwork-harness eval classifier`):
+
+| Job | Constant baseline | Kev-0.8B | **Jeff** |
+|---|---|---|---|
+| Triage of claims the verifier couldn't check (287 judged claims) | 93.4% | 86.1% (AUC 0.73) | **93.7%** (AUC 0.87), base model |
+| Prompt injection in real tool output (150 outputs, each also with a planted injection) | 50% | n/a | **94.3%** (AUC 0.99), `guard` adapter |
+
+At P ≥ 0.9 the guard catches 90% of planted injections, with 1.3% false alarms on real output. Its blind spot is instructions dressed as legitimate project policy.
 
 ---
 
@@ -123,7 +142,9 @@ Every layer is opt-in beyond L1–L3, and **no layer can mark anything green wit
 | **Test gate** `--verify-cmd` | Runs your tests; output becomes audited evidence |
 | **Repair loop** `--attempts` | Failure output → one repair step → re-gate, inside the budget |
 | **L4.5 Verifier** `--verify` | Deterministic answer-vs-evidence check. VERIFIED (with proof) · UNGROUNDED · MISSED — reported at equal prominence |
-| **Classifier triage** `--classify` | Sends L4.5's MISSED atoms to a decision model (TypeSafe Jev or local Kev). Routes only — can never grant green |
+| **Classifier triage** `--classify` | Sends L4.5's MISSED atoms to a decision model: a local Jeff (the best measured), TypeSafe Jev or Kev. Routes only; it can never grant green |
+| **Intent lanes** `--lane` | `direct` skips the world view, planner and critic for one-pass jobs. `auto` uses a small trained head, and asks a cheap LLM only when the head is unsure. Any doubt runs planned |
+| **Injection guard** `--guard` | Jeff's `guard` adapter screens file, shell, search, git and memory output before the model reads it. A hit is flagged, or withheld with `--guard-withhold`. The raw output stays on the audit trail. A guard that was asked for but can't run stops the run |
 | **L5 Reviewer** `--review` | Different vendor, read-only (read/grep/glob), rubric + quoted evidence; its citations are L4.5-checked |
 | **Review repair** `--review-fix` | An INCOMPLETE verdict → one repair from the reviewer's concerns → re-gate → re-review |
 
@@ -141,6 +162,8 @@ Decision records for every layer live in [`DECISIONS/`](DECISIONS).
 | `--time-budget <s>` | Wall-clock cap the model can see |
 | `--review [model]` / `--review-strict` / `--review-fix` | L5 review, fail on a non-COMPLETE verdict, repair from its concerns |
 | `--budget <usd>` / `--bedrock <usd>` | Soft session target / hard ceiling that is never crossed |
+| `--lane planned\|direct\|auto` · `--lane-model <id>` | Intent lane, and the direct lane's model (planned is the default) |
+| `--guard [p]` · `--guard-withhold` | Injection guard at P(attack) ≥ p (default 0.9); withhold instead of flag |
 
 ## Use it from Claude Code (MCP)
 
@@ -153,6 +176,21 @@ claude mcp add patchwork-harness -s user -- node /path/to/patchwork-harness/bin/
 16 tools: `harness_plan`, `harness_run` (+ `harness_run_status`), `harness_verify_claude` / `_session` / `_file`, `harness_review`, `harness_ask`, `harness_eval`, `harness_checkpoints`, `harness_rewind`, `harness_models`, `harness_status`, `harness_sessions`, `harness_show`, `harness_exam`. Anything that spends money or changes files requires `confirm: true`; background runs close stdin, so every permission prompt resolves to **deny**.
 
 Audit a Claude Code session's own answer against its tool outputs: `pwh verify claude --classify`.
+
+## Run inside Claude Code (mod)
+
+[`claude-mod/`](claude-mod) is a [Claude Code mod](https://code.claude.com/docs/en/plugins/mods/overview) (Claude Code 2.1.287+). It runs the harness's measured pieces inside Claude Code itself:
+
+- **Injection guard.** `Read`, `Bash`, `Grep`, `WebFetch`, `WebSearch` and MCP output is screened by Jeff's guard before Claude reads it. A hit is flagged or withheld, and you get a toast.
+- **`/verify [--classify]`.** L4.5 grounding on the current session. `/verify auto on` checks every answer; it is off by default, because auditing is requested, never forced.
+- **`/guard`, `/harness`.** Set the mode and threshold, and see what was caught.
+
+```bash
+bash scripts/jeff/serve.sh                      # a local Jeff with the guard adapter, on :8765
+claude --plugin-dir /path/to/patchwork-harness/claude-mod
+```
+
+`claude plugin validate ./claude-mod --strict` lists exactly what the mod hooks and calls. Its tests drive the real hooks without Claude Code (`tests/claude_mod.test.ts`). Mods are still rolling out, so check `claude plugin test` reports them as on for your account.
 
 ## Models
 
@@ -168,7 +206,8 @@ Routing is by **tier**, not brand: flagship coders for hard steps, workhorses fo
 | `ask "<prompt>"` | One call to one model (`-p`, `-m`, `--search` for cited web results) |
 | `review <paths>` | Cross-vendor adversarial review, merged and L4.5-checked |
 | `verify file\|session\|claude\|exam` | The L4.5 verifier (`--classify` for triage) |
-| `eval run\|review\|list` | Task suites and reviewer calibration |
+| `eval run\|review\|classifier\|list` | Task suites, reviewer calibration, and classifier scoring on labelled rows (Jeff adapter-kit format) |
+| `route "<goal>"` | Preview the lane `--lane auto` would take, and why |
 | `rewind <session>` | Checkpoints |
 | `mcp` | MCP server |
 | `models` · `doctor` · `keys` · `ls` · `show` · `tail` · `web` · `cockpit` · `resume` | Everything else |
@@ -177,17 +216,20 @@ Everything is also available as `pwh`.
 
 ## Configuration
 
-State lives in `~/.patchwork-harness/` (sessions, events, cache, evals, keys). Put your own `models.yml`, `model_capabilities.yml`, `budget.yml` or `policy.yml` there to override the bundled [`config/`](config). Environment variables use the `PATCHWORK_HARNESS_` prefix, e.g. `PATCHWORK_HARNESS_CLASSIFIER_URL`, `PATCHWORK_HARNESS_SHELL`, `PATCHWORK_HARNESS_ENABLE_CONTEXT_INJECTION`.
+State lives in `~/.patchwork-harness/` (sessions, events, cache, evals, keys). Put your own `models.yml`, `model_capabilities.yml`, `budget.yml` or `policy.yml` there to override the bundled [`config/`](config). Environment variables use the `PATCHWORK_HARNESS_` prefix, for example `PATCHWORK_HARNESS_JEFF_URL` (a local Jeff for triage and `--guard`), `PATCHWORK_HARNESS_INTENT_URL`, `PATCHWORK_HARNESS_SHELL` and `PATCHWORK_HARNESS_ENABLE_CONTEXT_INJECTION`.
 
 ## Architecture
 
 ```mermaid
 flowchart TD
-  A["boot: Patchwork check (fail-closed)"] --> B["L1 world view + L2 lessons"]
+  A["boot: Patchwork check (fail-closed)"] --> L{"Intent lane --lane"}
+  L -- "planned (default)" --> B["L1 world view + L2 lessons"]
+  L -- "direct" --> F
   B --> C["Planner → JSON plan (unreachable models swapped out)"]
   C --> D["L3 critic (different vendor)"]
   D --> E["Budget bedrock check"]
   E --> F["Executor: bounded tool loop per step (checkpoints, loop + time guards)"]
+  G["Injection guard --guard (Jeff)"] -. "screens tool output" .-> F
   F --> T["Test gate --verify-cmd → repair loop --attempts"]
   T --> R["L5 review --review → --review-fix"]
   R --> V["L4.5 verifier --verify → classifier triage --classify"]
@@ -198,14 +240,24 @@ More in [`ARCHITECTURE.md`](ARCHITECTURE.md) and [`SECURITY.md`](SECURITY.md).
 
 ## Status
 
-**v0.1.0 — early and honest.** It works end to end, the test suite is large (480+ tests), and every number above came from real runs. Known limits:
+**v0.2.0. Early, and honest about it.** It works end to end, the suite has 520+ tests, and every number above comes from real runs. Known limits:
 
-- The live re-planner (L4) is designed, not built.
-- The local Kev-0.8B classifier *failed* its calibration (it loses to a constant baseline); `--classify` stays flag-only — see [`DECISIONS/0013`](DECISIONS/0013-classifier-triage.md).
-- Two tests fail on Windows only (POSIX file modes and a path-matching test).
-- Eval sample sizes are small; the suite is cheap (~$0.20/run) — run more.
+- **L4** (the live re-planner) is designed, not built.
+- **`--lane auto` on chat-style text** is weak. On the 224 labelled requests, a model that sees only length and punctuation scores within 3 points of the trained intent head. Route self-contained goals, not chat messages.
+- **The injection guard is detection and defence in depth, not a security boundary.** Every current model we tried resisted our planted injections even without it. Policy-framed instructions get through the guard.
+- **The Claude Code mod** is statically validated and tested offline. It hasn't run live yet: mods are still rolling out.
+- **Two tests fail on Windows only** (POSIX file modes and a path-matching test).
+- **Eval samples are small.** The suite is cheap (about $0.20 a run), so run more, with the arms interleaved.
 
 See [`CHANGELOG.md`](CHANGELOG.md).
+
+## Credits
+
+- **[Jeff](https://github.com/firelex/jeff)** by Mathias Strasser: the open "System 1" decision models and adapters behind `--guard`, `--classify` and the mod's guard. Code MIT, weights Apache 2.0. It is built on [AutoJev](https://github.com/denis-pplx/autojev) by Denis Yarats.
+  - Patchwork Harness does **not** bundle Jeff. It talks to a Jeff server you run, over Jeff's HTTP API.
+  - Our classifier row files use Jeff's adapter-kit format, so they also work with `jeff-kit`.
+- **The System One request format** comes from TypeSafe's Jev. Jeff and Kev ([jaredpalmer/kev](https://github.com/jaredpalmer/kev)) serve the same format.
+- **[Claude Code mods](https://code.claude.com/docs/en/plugins/mods/overview)** by Anthropic.
 
 ## License
 

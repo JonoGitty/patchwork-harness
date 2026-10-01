@@ -298,5 +298,25 @@ export async function fallbackModelFor(
   for (const m of ordered) if ((await modelReach(m)) === "reachable") return m;
   const def = models.models.find((m) => m.id === models.defaults.executor && !excluded.has(m.id));
   if (def && (await modelReach(def)) === "reachable") return def;
+  // Nearest tier next. A tier held by one vendor (workhorse = Sonnet only)
+  // left every step routed to it with NO fallback when that vendor's account
+  // was out: the step failed although other vendors were up (29 Sept 2026,
+  // Anthropic out of credit, found by the ADR-0018 eval).
+  for (const t of NEAREST_TIERS[tier ?? ""] ?? NEAREST_TIERS.default!) {
+    for (const m of models.models) {
+      if (excluded.has(m.id) || tierOf.get(m.id) !== t) continue;
+      if ((await modelReach(m)) === "reachable") return m;
+    }
+  }
   return null;
 }
+
+/** Where a step goes when its own tier has nothing reachable: closest capability first. */
+const NEAREST_TIERS: Record<string, string[]> = {
+  workhorse: ["flagship", "flagship_alt", "cheap_fast"],
+  flagship: ["workhorse", "flagship_alt", "reasoning"],
+  flagship_alt: ["flagship", "workhorse"],
+  cheap_fast: ["workhorse", "flagship"],
+  reasoning: ["flagship", "flagship_alt"],
+  default: ["flagship", "workhorse", "flagship_alt", "cheap_fast"],
+};

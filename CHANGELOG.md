@@ -2,6 +2,28 @@
 
 All notable changes to Patchwork Harness. Versions follow [SemVer](https://semver.org/); each release's source converts to Apache 2.0 three years after it ships (see [LICENSE](LICENSE)).
 
+## [0.2.0] — 2026-10-01
+
+### Classifiers in the harness, measured first
+- **`eval classifier <rows.jsonl>`** scores any System One classifier (Jeff, Kev or Jev) on labelled rows in Jeff's adapter-kit format.
+  - It reports accuracy against the constant baseline, plus ECE, Brier, AUC and confidence bands.
+  - A failed call counts as wrong, never as right.
+- **Jeff backend** (`PATCHWORK_HARNESS_JEFF_URL`): a per-call adapter and answer-twice.
+  - Calls to a local server are queued, and the server's Retry-After is honoured. Jeff answers an overlapping request with 529 instead of queueing it.
+  - On grounding triage, Jeff is the first classifier to beat the constant (93.7% vs 93.4%, AUC 0.87). Kev scored 86.1% and AUC 0.73.
+- **Injection guard** `--guard [p]` / `--guard-withhold`: Jeff's `guard` adapter screens file, shell, search, git and memory output before the model reads it.
+  - The raw output stays on the audit trail.
+  - If the guard was asked for but can't run, the run refuses to start.
+  - Measured on 150 real tool outputs, each also with a planted injection: 90% caught, 1.3% false alarms at P ≥ 0.9.
+- **Intent lanes** `--lane planned|direct|auto`, plus `--lane-model` and `route "<goal>"`.
+  - The direct lane skips planning for one-pass jobs: −63% input tokens and −31% time on the same model.
+  - `auto` is a cascade: a small trained head, then a cheap LLM only in its uncertain band.
+- **Claude Code mod** (`claude-mod/`): the guard, `/verify`, `/guard` and `/harness` inside Claude Code 2.1.287+. It is statically validated and tested offline.
+
+### Fixed
+- Planner and critic spend was never on the ledger, so session totals and the spend ceiling left planning out.
+- A tier held by a single vendor had no fallback, so a dead account failed every step routed to it. Fallback now widens to the nearest tier.
+
 ## [0.1.0] — 2026-09-29
 
 First public release.

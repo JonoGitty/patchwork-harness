@@ -11,6 +11,7 @@ import { loadModels } from "../config.js";
 import { type HumanChannel, createHumanChannel } from "../permissions/human.js";
 import { pluginCatalogue, runPluginHook } from "../plugins/manager.js";
 import { setBudgetState } from "../tools/budget_status.js";
+import { reachableModels } from "../providers/availability.js";
 import type { JsonReporter } from "../util/json_reporter.js";
 import { log } from "../util/logger.js";
 import { newSessionId } from "../util/ulid.js";
@@ -24,8 +25,10 @@ import {
 } from "./budget.js";
 import { runStep } from "./executor.js";
 import { type HarnessOptions, checkpoint, repairDescription, runGate } from "./harness.js";
+import { DEFAULT_GUARD_THRESHOLD, type InjectionGuard, guardReady } from "./guard.js";
+import { type IntentRoute, type Lane, type LaneMode, directPlan, routeIntent } from "./intent.js";
 import { findSimilarSessions, renderLessons } from "./lessons.js";
-import { plan as makePlan, scopeProposal } from "./planner.js";
+import { enforceReachable, plan as makePlan, scopeProposal } from "./planner.js";
 import { persistSession } from "./transcript.js";
 import type { Plan, SessionState, SessionStatus, Step, StepResult } from "./types.js";
 import { assembleWorldView } from "./world_view.js";
@@ -64,6 +67,12 @@ export interface OneShotInput {
   priorContext?: string;
   /** Opt-in harness options (ADR-0015): test gate, repair loop, checkpoints, guards. */
   harness?: HarnessOptions;
+  /** ADR-0018 intent lane: planned (default, unchanged), direct (no planner), auto (classifier picks). */
+  lane?: LaneMode;
+  /** With lane auto: the intent head's P(no plan needed) that takes the direct lane without asking the LLM (default 0.6). */
+  laneThreshold?: number;
+  /** The direct lane's model (default: the executor role). */
+  laneModel?: string;
 }
 
 export async function oneShot(input: OneShotInput): Promise<{
@@ -163,10 +172,119 @@ export async function oneShot(input: OneShotInput): Promise<{
       ),
     );
 
+    // INJECTION GUARD (ADR-0019): asked for means required. Checked before any
+    // planning spend, so an unreachable guard costs nothing and runs nothing.
+    let injection: InjectionGuard | undefined;
+    if (input.harness?.guard) {
+      const url = process.env.PATCHWORK_HARNESS_JEFF_URL?.trim().replace(/\/+$/, "");
+      if (!url)
+        throw new Error(
+          "--guard needs a Jeff server with the guard adapter: set PATCHWORK_HARNESS_JEFF_URL (ADR-0019)",
+        );
+      injection = {
+        cfg: {
+          backend: "jeff",
+          url,
+          model: "jeff-latest",
+          apiKey: process.env.PATCHWORK_HARNESS_JEFF_KEY?.trim() || undefined,
+        },
+        model: process.env.PATCHWORK_HARNESS_GUARD_MODEL?.trim() || "guard",
+        threshold: input.harness.guard.threshold ?? DEFAULT_GUARD_THRESHOLD,
+        mode: input.harness.guard.mode ?? "flag",
+      };
+      const ready = await guardReady(injection);
+      if (!ready.ok)
+        throw new Error(
+          `--guard: the injection guard is not available (${ready.reason}); refusing to run unguarded`,
+        );
+      audit.emit({
+        action: "route_decision",
+        target: {
+          harness: "guard",
+          model: injection.model,
+          threshold: injection.threshold,
+          mode: injection.mode,
+          url,
+        },
+      });
+      log.info(
+        chalk.dim(`guard   ${injection.model} at P >= ${injection.threshold} (${injection.mode})`),
+      );
+    }
+
+    // INTENT LANE (ADR-0018). World view, lessons and the critic only feed
+    // the planner, so the direct lane skips all of them with it.
+    const laneMode: LaneMode = input.lane ?? "planned";
+    let route: IntentRoute | undefined;
+    if (laneMode === "auto") {
+      route = await routeIntent(input.goal, {
+        hi: input.laneThreshold,
+        // the LLM router's spend is on the ledger like every other call
+        onUsage: (u) => {
+          budget.spent_usd += u.cost_usd;
+          state.total_cost_usd = budget.spent_usd;
+          audit.emit({
+            action: "provider_response",
+            status: "completed",
+            target: { phase: "router", model: u.model },
+            provenance: {
+              cost_usd: u.cost_usd,
+              tokens_in: u.tokens_in,
+              tokens_out: u.tokens_out,
+              duration_ms: u.duration_ms,
+              budget: budgetSnapshot(budget),
+            },
+          });
+        },
+      });
+    }
+    const lane: Lane = laneMode === "auto" ? (route?.lane ?? "planned") : laneMode;
+    if (laneMode !== "planned") {
+      state.lane = {
+        lane,
+        mode: laneMode,
+        stage: route?.stage,
+        p_fast: route?.p_fast,
+        label: route?.label,
+        llm_label: route?.llm_label,
+        latency_ms: (route?.head_latency_ms ?? 0) + (route?.llm_latency_ms ?? 0),
+      };
+      audit.emit({
+        action: "route_decision",
+        target: {
+          harness: "intent",
+          lane,
+          mode: laneMode,
+          stage: route?.stage,
+          p_fast: route?.p_fast,
+          label: route?.label,
+          head_model: route?.head_model,
+          head_latency_ms: route?.head_latency_ms,
+          llm_model: route?.llm_model,
+          llm_label: route?.llm_label,
+          llm_confidence: route?.llm_confidence,
+          llm_latency_ms: route?.llm_latency_ms,
+        },
+        provenance: {
+          reason: route?.reason ?? `--lane ${laneMode}`,
+          probabilities: route?.probabilities,
+        },
+      });
+      reporter?.emit("harness", {
+        kind: "intent",
+        lane,
+        mode: laneMode,
+        stage: route?.stage,
+        p_fast: route?.p_fast,
+        llm_label: route?.llm_label,
+      });
+      log.info(chalk.dim(`lane    ${lane}${route ? ` (${route.reason})` : ""}`));
+    }
+
     // SMART CONDUCTOR — Layer 1 + Layer 2: world view + lessons (in parallel)
-    const worldViewEnabled = input.worldViewEnabled !== false;
-    const lessonsEnabled = input.lessonsEnabled !== false;
-    const criticEnabled = input.criticEnabled !== false;
+    const worldViewEnabled = lane === "planned" && input.worldViewEnabled !== false;
+    const lessonsEnabled = lane === "planned" && input.lessonsEnabled !== false;
+    const criticEnabled = lane === "planned" && input.criticEnabled !== false;
 
     // Memory spine planner auto-injection is OFF by default after the
     // 2026-05-27 security audit (prompt-injection amplification risk:
@@ -178,7 +296,8 @@ export async function oneShot(input: OneShotInput): Promise<{
     // top of the data, not the bottom.
     const envOptIn = process.env.PATCHWORK_HARNESS_ENABLE_CONTEXT_INJECTION === "1";
     const contextEnabled =
-      input.contextEnabled === true || (input.contextEnabled !== false && envOptIn);
+      lane === "planned" &&
+      (input.contextEnabled === true || (input.contextEnabled !== false && envOptIn));
     const [worldViewRaw, similarSessions, contextPacket] = await Promise.all([
       worldViewEnabled ? assembleWorldView(input.cwd, input.goal) : Promise.resolve(""),
       lessonsEnabled ? findSimilarSessions(input.goal) : Promise.resolve([]),
@@ -223,20 +342,49 @@ export async function oneShot(input: OneShotInput): Promise<{
     // no pause steps, prompts deny-and-continue (executor).
     const unattended = input.permission_mode === "auto";
     const modelDefaults = loadModels().defaults;
-    log.step(
-      "Planning",
-      `with ${modelDefaults.planner}${criticEnabled ? ` + critic pass (${modelDefaults.critic ?? modelDefaults.planner})` : ""}${unattended ? " [unattended]" : ""}`,
-    );
-    const pluginInfo = await pluginCatalogue();
-    const plan = await makePlan(input.goal, {
-      pluginCatalogue: pluginInfo,
-      budget,
-      worldView,
-      lessons: lessonsBlock,
-      criticEnabled,
-      audit,
-      unattended,
-    });
+    let plan: Plan;
+    if (lane === "direct") {
+      log.step("Direct lane", "no planner or critic: one executor step");
+      const catalog = loadModels().models;
+      const exec = input.laneModel ?? modelDefaults.executor;
+      const provider = (catalog.find((m) => m.id === exec)?.provider ??
+        "anthropic") as Step["provider"];
+      plan = directPlan(input.goal, { id: exec, provider });
+      const { reachable } = await reachableModels(catalog);
+      plan.steps = await enforceReachable(plan.steps, reachable);
+    } else {
+      log.step(
+        "Planning",
+        `with ${modelDefaults.planner}${criticEnabled ? ` + critic pass (${modelDefaults.critic ?? modelDefaults.planner})` : ""}${unattended ? " [unattended]" : ""}`,
+      );
+      const pluginInfo = await pluginCatalogue();
+      plan = await makePlan(input.goal, {
+        pluginCatalogue: pluginInfo,
+        budget,
+        worldView,
+        lessons: lessonsBlock,
+        criticEnabled,
+        audit,
+        unattended,
+        // planning spend counts toward the session and the bedrock, on the record
+        onUsage: (u) => {
+          budget.spent_usd += u.cost_usd;
+          state.total_cost_usd = budget.spent_usd;
+          audit.emit({
+            action: "provider_response",
+            status: "completed",
+            target: { phase: u.phase, model: u.model },
+            provenance: {
+              cost_usd: u.cost_usd,
+              tokens_in: u.tokens_in,
+              tokens_out: u.tokens_out,
+              duration_ms: u.duration_ms,
+              budget: budgetSnapshot(budget),
+            },
+          });
+        },
+      });
+    }
     state.plan = plan;
     audit.emit({
       action: "plan_ready",
@@ -291,6 +439,7 @@ export async function oneShot(input: OneShotInput): Promise<{
       loop: harness.loopGuard === true,
       deadlineMs: harness.timeBudgetS ? startedMs + harness.timeBudgetS * 1000 : undefined,
       startedMs,
+      injection,
     };
     let checkpointing = harness.checkpoint === true;
     const snap = async (label: string) => {

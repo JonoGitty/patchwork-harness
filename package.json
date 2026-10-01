@@ -1,6 +1,6 @@
 {
   "name": "patchwork-harness",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "The verifying harness for AI coding agents: multi-vendor routing, test gates, independent review and grounded answers, with every action on the Patchwork audit trail.",
   "type": "module",
   "bin": {

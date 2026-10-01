@@ -346,6 +346,7 @@ defaults:
   executor: claude-opus-5-5          # 28 Sept: beats Opus 5 on every vendor-reported coding/agent benchmark AND is cheaper ($4/$20 vs $5/$25); 1M ctx, 128k out
   bulk_executor: claude-sonnet-5     # $2/$10, 1M ctx, fast - mechanical and bulk edits
   critic: gemini-3.8-flash           # a DIFFERENT vendor critiques the plan; fast, $0.75/$3.75; falls back to the planner model if Gemini is off
+  intent_router: gpt-6-luna          # ADR-0018: asked only when the intent head is unsure; 78.6% on 224 labelled real requests (8/8 right on patchwork-harness goals), ~2 s, ~$0.0002 a call
   # Ordered preference; `patchwork-harness review` fans out to the first REACHABLE model
   # per provider (max 3, different vendors). Unverified ids lead on purpose:
   # they are skipped silently until the key can reach them, then used at once.

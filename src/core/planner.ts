@@ -303,9 +303,25 @@ function modeNote(mode: BudgetState["mode"]): string {
   return [profile.description, prefer, avoid, overrun].filter(Boolean).join(" ");
 }
 
+/**
+ * One planning-side LLM call (planner or critic), reported so the session
+ * ledger and the audit trail count it. Until 29 Sept 2026 neither was
+ * recorded: every session's total, and the bedrock check, left planning out.
+ */
+export interface PlanUsage {
+  phase: "planner" | "critic";
+  model: string;
+  tokens_in: number;
+  tokens_out: number;
+  cost_usd: number;
+  duration_ms: number;
+}
+type OnUsage = (u: PlanUsage) => void;
+
 async function planOnce(
   goal: string,
   opts: {
+    onUsage?: OnUsage;
     plannerModel: string;
     pluginCatalogue: string;
     budget: BudgetState;
@@ -343,6 +359,15 @@ async function planOnce(
     maxTokens: 2048,
     temperature: 0.2,
     messages: [{ role: "user", content: [{ type: "text", text: prompt }] }],
+  });
+  // before parsing: an unusable reply still cost money
+  opts.onUsage?.({
+    phase: "planner",
+    model: opts.plannerModel,
+    tokens_in: resp.usage?.input_tokens ?? 0,
+    tokens_out: resp.usage?.output_tokens ?? 0,
+    cost_usd: resp.cost_usd ?? 0,
+    duration_ms: resp.duration_ms ?? 0,
   });
 
   const text = resp.content
@@ -392,6 +417,7 @@ async function critiquePlan(
   budget: BudgetState,
   criticModel: string,
   fallbackModel: string,
+  onUsage?: OnUsage,
 ): Promise<{ verdict: "approve" | "revise"; suggestions: string[]; model: string }> {
   // The critic is ideally a DIFFERENT vendor from the planner
   // (defaults.critic); fall back to the planner's model, then skip.
@@ -411,6 +437,14 @@ async function critiquePlan(
     messages: [
       { role: "user", content: [{ type: "text", text: CRITIC_PROMPT_TEMPLATE(plan, budget) }] },
     ],
+  });
+  onUsage?.({
+    phase: "critic",
+    model,
+    tokens_in: resp.usage?.input_tokens ?? 0,
+    tokens_out: resp.usage?.output_tokens ?? 0,
+    cost_usd: resp.cost_usd ?? 0,
+    duration_ms: resp.duration_ms ?? 0,
   });
   const text = resp.content
     .filter((c): c is { type: "text"; text: string } => c.type === "text")
@@ -459,6 +493,8 @@ export async function plan(
     audit?: AuditEmitter;
     /** No human present: never emit pause_for_human steps. */
     unattended?: boolean;
+    /** Called once per planner/critic call with its tokens and cost. */
+    onUsage?: OnUsage;
   },
 ): Promise<Plan & { critique?: CritiqueResult }> {
   const cfg = loadModels();
@@ -486,6 +522,7 @@ export async function plan(
     reachable,
     hidden,
     unattended: opts.unattended ?? false,
+    onUsage: opts.onUsage,
   };
 
   let draft = await planResilient(goal, planArgs);
@@ -514,6 +551,7 @@ export async function plan(
     opts.budget,
     cfg.defaults.critic ?? plannerModel,
     plannerModel,
+    opts.onUsage,
   );
   opts.audit?.emit({
     action: "plan_ready",

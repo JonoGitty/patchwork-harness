@@ -1,0 +1,32 @@
+{
+  "name": "patchwork-harness",
+  "version": "0.1.0",
+  "description": "The patchwork-harness harness inside Claude Code: a prompt-injection guard on tool output (Jeff's guard adapter) and L4.5 grounding verification on request.",
+  "author": { "name": "Jono Gitty" },
+  "userConfig": {
+    "jeff_url": {
+      "type": "string",
+      "title": "Jeff server URL",
+      "description": "A local Jeff server with the guard adapter (scripts/jeff/serve.sh). Default http://127.0.0.1:8765",
+      "default": "http://127.0.0.1:8765"
+    },
+    "guard": {
+      "type": "string",
+      "title": "Injection guard",
+      "description": "off, flag (warn Claude in front of a suspicious tool output) or withhold (replace it with a notice). Default flag",
+      "default": "flag"
+    },
+    "guard_threshold": {
+      "type": "string",
+      "title": "Guard threshold",
+      "description": "P(attack) at or above which an output is flagged. 0.9 caught 90% of planted injections with 1.3% false alarms",
+      "default": "0.9"
+    },
+    "cli": {
+      "type": "string",
+      "title": "patchwork-harness command",
+      "description": "How to run patchwork-harness for /verify: a command on PATH, or a JSON array of arguments",
+      "default": "patchwork-harness"
+    }
+  }
+}

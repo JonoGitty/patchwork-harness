@@ -73,6 +73,13 @@ export const PRESETS: Record<string, string[]> = {
     "600",
   ],
   "gate+review+fix": ["--verify-cmd", "{verify}", "--attempts", "3", "--review", "--review-fix"],
+  // ADR-0018 intent lanes
+  direct: ["--lane", "direct"],
+  intent: ["--lane", "auto"],
+  "gate+direct": ["--verify-cmd", "{verify}", "--attempts", "3", "--lane", "direct"],
+  // ADR-0019 injection guard
+  guard: ["--guard"],
+  "gate+guard": ["--verify-cmd", "{verify}", "--attempts", "3", "--guard"],
 };
 
 export function loadSuite(dir: string): EvalTask[] {

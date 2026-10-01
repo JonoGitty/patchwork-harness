@@ -37,6 +37,7 @@ import {
   snapshot,
   withinSessionAllowance,
 } from "./budget.js";
+import { type InjectionGuard, guardContent, screen } from "./guard.js";
 import type { Step, StepResult } from "./types.js";
 
 interface RunStepInput {
@@ -69,6 +70,8 @@ interface RunStepInput {
     deadlineMs?: number;
     /** Run start, for the "time used" line the model sees. */
     startedMs?: number;
+    /** ADR-0019: screen outside content for prompt injection before the model reads it. */
+    injection?: InjectionGuard;
   };
 }
 
@@ -678,7 +681,45 @@ export async function runStep(input: RunStepInput): Promise<StepResult> {
             action: "route_decision",
             target: { step: step.title, guard: "loop", tool: tool.name, repeats: n },
           });
-        toolResults.push({ type: "tool_result", tool_use_id: tu.id, content: json + nudge });
+        // ADR-0019 injection guard: outside content is screened before the
+        // model reads it. Only what the MODEL sees changes; the audit trail
+        // below keeps the raw output.
+        let content = json + nudge;
+        if (guards.injection) {
+          const s = await screen(guards.injection, tool.name, json);
+          if (s.screened || s.error) {
+            audit.emit({
+              action: "route_decision",
+              target: {
+                step: step.title,
+                guard: "injection",
+                tool: tool.name,
+                p: s.p,
+                flagged: s.flagged,
+                windows: s.windows,
+                mode: guards.injection.mode,
+                ...(s.error ? { error: s.error.slice(0, 200) } : {}),
+              },
+            });
+            if (s.flagged || s.error) {
+              reporter?.emit("harness", {
+                kind: "guard",
+                tool: tool.name,
+                p: s.p,
+                flagged: s.flagged,
+                error: s.error,
+              });
+              if (!reporter)
+                log.warn(
+                  s.error
+                    ? `guard could not screen the ${tool.name} output: ${s.error.slice(0, 120)}`
+                    : `guard: possible prompt injection in the ${tool.name} output (P ${(s.p ?? 0).toFixed(2)}) - ${guards.injection.mode === "withhold" ? "withheld" : "flagged to the model"}`,
+                );
+            }
+            content = guardContent(guards.injection, tool.name, s, json) + nudge;
+          }
+        }
+        toolResults.push({ type: "tool_result", tool_use_id: tu.id, content });
         // Audit log keeps the full diff (durable record on disk)
         const auditJson = JSON.stringify(result).slice(0, 16000);
         audit.emit({

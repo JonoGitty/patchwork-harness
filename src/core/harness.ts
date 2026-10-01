@@ -33,6 +33,8 @@ export interface HarnessOptions {
   reviewStrict?: boolean;
   /** On an INCOMPLETE L5 verdict: one repair step from its concerns, re-gate, re-review. */
   reviewFix?: boolean;
+  /** ADR-0019: screen outside content for prompt injection (Jeff's `guard` adapter). */
+  guard?: { threshold?: number; mode?: "flag" | "withhold" };
 }
 
 export interface GateResult {

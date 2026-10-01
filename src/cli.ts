@@ -38,7 +38,7 @@ import { StdoutJsonReporter } from "./util/json_reporter.js";
 import { listKeys, setKey, unsetKey, envFilePath, KEY_NAMES } from "./util/key_store.js";
 import { startRepl } from "./cli/repl.js";
 
-const VERSION = "0.1.0";
+const VERSION = "0.2.0";
 
 const program = new Command();
 program
@@ -249,6 +249,70 @@ evalCmd
   });
 
 evalCmd
+  .command("classifier <rows>")
+  .description(
+    "Score a System One classifier (Jeff, Kev or Jev) on labelled rows in Jeff's adapter-kit format " +
+    "(id, family, state, question, label) against the constant baseline: accuracy, calibration error (ECE), " +
+    "Brier, AUC and confidence bands for --positive. Prove a classifier before the harness trusts it.",
+  )
+  .option("--url <url>", "classifier server (default: PATCHWORK_HARNESS_CLASSIFIER_URL / PATCHWORK_HARNESS_JEFF_URL / TYPESAFE_API_KEY)")
+  .option("--backend <name>", "with --url: jeff | kev", "jeff")
+  .option("--model <name>", "model or Jeff adapter, e.g. jeff-latest, guard, ground")
+  .option("--orders <n>", "2 = answer twice with the options reversed and average (Jeff)", "1")
+  .option("--positive <keys>", "choice keys counted as the positive class for AUC and bands (noul: always true)")
+  .option("--hi <p>", "high band: P(positive) at or above", "0.7")
+  .option("--lo <p>", "low band: P(positive) at or below", "0.3")
+  .option("--limit <n>", "only the first n rows")
+  .option("--parallel <n>", "requests at a time", "2")
+  .option("--json", "print the report as JSON")
+  .action(async (rowsPath: string, opts) => {
+    const { readRows, evalClassifier } = await import("./eval/classifier.js");
+    const { classifierConfig } = await import("./classifier/systemone.js");
+    const cfg = opts.url
+      ? {
+          backend: (opts.backend === "kev" ? "kev" : "jeff") as "kev" | "jeff",
+          url: String(opts.url).replace(/\/+$/, ""),
+          model: opts.backend === "kev" ? "kev-latest" : "jeff-latest",
+        }
+      : classifierConfig();
+    if (!cfg) {
+      log.error("no classifier: pass --url, or set PATCHWORK_HARNESS_JEFF_URL, PATCHWORK_HARNESS_CLASSIFIER_URL or TYPESAFE_API_KEY");
+      process.exit(1);
+    }
+    const report = await evalClassifier(cfg, readRows(rowsPath), {
+      model: opts.model,
+      orders: Number(opts.orders) === 2 ? 2 : 1,
+      positive: opts.positive ? String(opts.positive).split(",").map((k: string) => k.trim()) : undefined,
+      hi: Number(opts.hi),
+      lo: Number(opts.lo),
+      limit: opts.limit ? Number(opts.limit) : undefined,
+      concurrency: Number(opts.parallel) || 2,
+    });
+    const { writeFileSync, mkdirSync } = await import("node:fs");
+    const { join, basename } = await import("node:path");
+    const { HOME_HARNESS } = await import("./util/paths.js");
+    const dir = join(HOME_HARNESS, "evals");
+    mkdirSync(dir, { recursive: true });
+    const out = join(dir, `${new Date().toISOString().replace(/[:.]/g, "-")}-classifier-${basename(rowsPath, ".jsonl")}-${report.model}.json`);
+    writeFileSync(out, JSON.stringify(report, null, 1));
+    if (opts.json) {
+      process.stdout.write(JSON.stringify({ ...report, rows: undefined, file: out }) + "\n");
+      return;
+    }
+    const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
+    const beats = report.accuracy > report.constant.accuracy;
+    console.log(chalk.bold(`\n  ${report.backend}/${report.model}${report.orders === 2 ? " (answered twice)" : ""} on ${report.n} rows, ${report.families} families`));
+    console.log(`  accuracy      ${(beats ? chalk.green : chalk.red)(pct(report.accuracy))}   constant "${report.constant.label}" ${pct(report.constant.accuracy)}${report.errors ? chalk.red(`   ${report.errors} error(s) counted wrong`) : ""}`);
+    console.log(`  calibration   ECE ${report.ece.toFixed(3)}   Brier ${report.brier.toFixed(4)}`);
+    if (report.auc !== undefined) console.log(`  ranking       AUC ${report.auc.toFixed(3)} for positive = ${report.positive?.join("+")}`);
+    if (report.bands) {
+      const b = report.bands;
+      console.log(`  bands         P >= ${b.hi}: ${b.high.n} rows, ${b.high.positive} positive   |   P <= ${b.lo}: ${b.low.n} rows, ${b.low.positive} positive`);
+    }
+    console.log(chalk.dim(`  median ${report.median_latency_ms} ms per decision   ->  ${out}`));
+  });
+
+evalCmd
   .command("review <suite>")
   .description(
     "Calibrate the L5 reviewer on PLANTED solutions (solutions/good, solutions/bad-*): every bad one passes " +
@@ -302,6 +366,31 @@ evalCmd
     const file = join(dir, `${new Date().toISOString().replace(/[:.]/g, "-")}-l5cal.json`);
     writeFileSync(file, JSON.stringify({ suite, scores, rows }, null, 2));
     console.log(chalk.dim(`\n  results: ${file}`));
+  });
+
+program
+  .command("route <goal>")
+  .description(
+    "ADR-0018: show which lane `--lane auto` would take for a goal, and why " +
+    "(intent head first, the LLM router only if the head is unsure). Runs nothing. " +
+    "The LLM stage, if reached, costs ~$0.0002.",
+  )
+  .option("--lane-threshold <p>", "head P(no plan needed) that decides direct on its own", "0.6")
+  .option("--json", "print the decision as JSON")
+  .action(async (goal: string, opts) => {
+    const { routeIntent } = await import("./core/intent.js");
+    const r = await routeIntent(goal, { hi: Number(opts.laneThreshold) });
+    if (opts.json) {
+      console.log(JSON.stringify(r));
+      return;
+    }
+    const tag = r.lane === "direct" ? chalk.cyan("direct") : chalk.yellow("planned");
+    console.log(`  lane     ${tag}  (decided by: ${r.stage})`);
+    if (r.p_fast !== undefined)
+      console.log(`  head     P(no plan) ${r.p_fast.toFixed(2)}  ${chalk.dim(`${r.head_latency_ms} ms · ${r.head_model}`)}`);
+    if (r.llm_model)
+      console.log(`  llm      ${r.llm_label ?? "?"} @ ${r.llm_confidence ?? "?"}  ${chalk.dim(`${r.llm_latency_ms} ms · ${r.llm_model}`)}`);
+    console.log(chalk.dim(`  ${r.reason}`));
   });
 
 program
@@ -493,8 +582,8 @@ memoryCmd
 
 // ============== verify group (ADR-0011 / ADR-0012) ==============
 const CLASSIFY_HELP =
-  "ADR-0013: send the MISSED atoms to a decision model (Jev via TYPESAFE_API_KEY, " +
-  "or a local Kev via PATCHWORK_HARNESS_CLASSIFIER_URL) and print a review triage under the " +
+  "ADR-0013: send the MISSED atoms to a decision model (a local Jeff via PATCHWORK_HARNESS_JEFF_URL, " +
+  "the best measured; or Jev via TYPESAFE_API_KEY; or Kev via PATCHWORK_HARNESS_CLASSIFIER_URL) and print a review triage under the " +
   "report. Routes only — never changes a verdict or the exit code";
 
 /** --classify: triage rides alongside the report; failures only warn. */
@@ -1260,6 +1349,11 @@ program
   .option("--review [model]", "ADR-0016 L5 reviewer: a model from a different vendor reviews the finished work read-only against a rubric, citing evidence; its citations are L4.5-checked. Optional model id overrides the reviewer role")
   .option("--review-strict", "with --review: a verdict other than COMPLETE fails the command (exit 1)")
   .option("--review-fix", "with --review: on an INCOMPLETE verdict, one repair step works from the reviewer's cited concerns, then the gate and the review run again (implies --review)")
+  .option("--lane <mode>", "ADR-0018 intent lane: planned (default: world view + planner + critic), direct (no planner: one executor step), auto (intent head at PATCHWORK_HARNESS_INTENT_URL, then the intent_router LLM only if the head is unsure; anything else -> planned). Preview a decision with `patchwork-harness route`", "planned")
+  .option("--lane-threshold <p>", "with --lane auto: the intent head's P(no plan needed) that takes the direct lane without asking the LLM", "0.6")
+  .option("--guard [p]", "ADR-0019: screen file, shell, search, git and memory output for prompt injection before the model reads it (Jeff guard adapter at PATCHWORK_HARNESS_JEFF_URL); flag at P(attack) >= p", )
+  .option("--guard-withhold", "with --guard: withhold a flagged output from the model instead of flagging it (also withholds outputs the guard could not screen)")
+  .option("--lane-model <id>", "the direct lane's model (default: the executor role). The planned lane routes small steps to cheaper tiers; the direct lane otherwise always uses the flagship")
   .action(async (goal: string | undefined, opts) => {
     // No goal? Drop into the REPL — `patchwork-harness` should "just work" like `claude`.
     if (!goal) {
@@ -1303,6 +1397,22 @@ program
       process.exit(1);
     }
 
+    if (!["planned", "direct", "auto"].includes(opts.lane)) {
+      log.error(`--lane must be one of planned|direct|auto (got ${opts.lane})`);
+      process.exit(1);
+    }
+    if (
+      opts.laneModel &&
+      !(await import("./config.js")).loadModels().models.some((m) => m.id === opts.laneModel)
+    ) {
+      log.error(`--lane-model: unknown model '${opts.laneModel}' (see \`patchwork-harness models\`)`);
+      process.exit(1);
+    }
+    const laneThreshold = Number(opts.laneThreshold);
+    if (!(laneThreshold > 0 && laneThreshold <= 1)) {
+      log.error(`--lane-threshold must be in (0, 1] (got ${opts.laneThreshold})`);
+      process.exit(1);
+    }
     const budget_mode = opts.mode as "budget" | "balanced" | "unlimited";
     if (!["budget", "balanced", "unlimited"].includes(budget_mode)) {
       log.error(`--mode must be one of budget|balanced|unlimited (got ${opts.mode})`);
@@ -1327,6 +1437,9 @@ program
         contextTopK: opts.contextTopK ? Number(opts.contextTopK) : undefined,
         lessonsEnabled: opts.lessons !== false,
         criticEnabled: opts.critic !== false,
+        lane: opts.lane,
+        laneThreshold: Number(opts.laneThreshold),
+        laneModel: opts.laneModel,
         harness: {
           verifyCmd: opts.verifyCmd,
           verifyTimeoutS: Number(opts.verifyTimeout) || 600,
@@ -1337,6 +1450,13 @@ program
           review: opts.review ?? (opts.reviewFix ? true : undefined),
           reviewStrict: opts.reviewStrict === true,
           reviewFix: opts.reviewFix === true,
+          guard:
+            opts.guard || opts.guardWithhold
+              ? {
+                  threshold: typeof opts.guard === "string" ? Number(opts.guard) : undefined,
+                  mode: opts.guardWithhold ? "withhold" : "flag",
+                }
+              : undefined,
         },
       });
       // Bedrock breach exits with status 2 to distinguish from normal failure

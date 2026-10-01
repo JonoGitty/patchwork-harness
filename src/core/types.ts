@@ -72,6 +72,16 @@ export interface SessionState {
   };
   /** --checkpoint snapshots taken (labels under refs/patchwork-harness/<session>/). */
   checkpoints?: string[];
+  /** ADR-0018: which intent lane ran, and why (absent = planned by default). */
+  lane?: {
+    lane: "direct" | "planned";
+    mode: "direct" | "planned" | "auto";
+    stage?: "head" | "llm" | "none";
+    p_fast?: number;
+    label?: string;
+    llm_label?: string;
+    latency_ms?: number;
+  };
   /** L5 reviewer verdict (ADR-0016); absent unless --review. */
   review?: import("./reviewer.js").ReviewResult;
 }

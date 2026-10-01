@@ -50,7 +50,8 @@ export function bandOf(p: number): Band {
 }
 
 /** Kev trained on states ≤384 tokens; Jev takes far more. ~4 chars a token. */
-export const STATE_CHARS = Object.freeze({ kev: 1500, jev: 8000 });
+/** Jeff reads up to 8,192 tokens per request; use the same budget as Jev. */
+export const STATE_CHARS = Object.freeze({ kev: 1500, jev: 8000, jeff: 8000 });
 const LINES_PER_CLAIM = 5;
 
 /** The one question, frozen: wording changes move probabilities. */

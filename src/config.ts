@@ -56,6 +56,8 @@ const ModelsConfig = z.object({
     /** L5 reviewer (ADR-0016): ordered list; the first reachable model from a
      *  DIFFERENT vendor than the executor's reviews the finished work. */
     reviewer: RoleList.optional(),
+    /** ADR-0018: the LLM asked by `--lane auto` when the custom intent head is unsure. */
+    intent_router: z.string().optional(),
   }),
 });
 export type ModelsConfig = z.infer<typeof ModelsConfig>;

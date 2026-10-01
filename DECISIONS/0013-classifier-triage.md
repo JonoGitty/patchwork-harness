@@ -189,3 +189,73 @@ truncated one table-row context.
     cd ~/kev                     # WSL; cloned 28 Sep, uv sync --extra serve done
     uv run --extra serve python -m kev.serve --run jaredpalmer/kev-0.8b --port 8009
     PATCHWORK_HARNESS_CLASSIFIER_URL=http://127.0.0.1:8009 patchwork-harness verify claude --classify
+
+## 1 Oct 2026: Jeff (firelex/jeff v1.2) on the same 287 consensus claims
+
+**What Jeff is.** An open 0.8B "System 1" model by Mathias Strasser. It is
+MIT/Apache-licensed and Jev-compatible: it serves `POST /v1/systemone`,
+which our client already calls.
+
+**How it was run.** `jeff-serve` ran locally from `~/jeff-models` (its own
+venv, CUDA) on :8765, against the same evidence Kev saw.
+
+| Model | acc@0.5 | AUC | Brier | P ≥ 0.7: right / wrong | P ≤ 0.3: n (wrong) |
+|---|---|---|---|---|---|
+| Constant "unsupported" | 0.934 | n/a | 0.066 | n/a | n/a |
+| Kev-0.8B (28 Sep) | 0.861 | 0.725 | 0.134 | 5 / 11 | 154 (6) |
+| Jeff base, zero-shot (noul) | 0.780 | **0.862** | 0.161 | 11 / 15 | 121 (**1**) |
+| Jeff + `ground` adapter | 0.934 | 0.791 | **0.062** | 3 / 3 | 279 (16) |
+| Jeff + `ground`, answered twice | 0.934 | 0.783 | 0.062 | 3 / 3 | 279 (16) |
+
+- **The published `ground` adapter does not transfer.** It scores 97% on its
+  own SQuAD/HotpotQA-style test set but sits at the constant here. Our claims
+  are numbers inside markdown tables, judged against tool output. It is the
+  first model to edge the constant on Brier (0.062 against 0.066), but its
+  "likely supported" band is 50% wrong.
+- **Jeff base ranks best of everything tried** (AUC 0.862 against Kev's
+  0.725). Its ≤ 0.3 band is right on 120 of 121 claims. That is useful for
+  ordering what L5 or a human looks at first; it is still never a VERIFIED.
+- **The verdict stays: no classifier grants green.** For `--classify`, Jeff
+  base is a better triage router than Kev-0.8B: point
+  `PATCHWORK_HARNESS_CLASSIFIER_URL` at jeff-serve with model `jeff-latest`. An adapter
+  for our own claim distribution needs far more positives than 19.
+
+## 1 Oct 2026, later: Jeff through the harness and the real triage path
+
+**New tooling.** `patchwork-harness eval classifier <rows.jsonl>` scores any System One
+backend on labelled rows in Jeff's adapter-kit format.
+- **Rows.** `~/.patchwork-harness/classifier-rows/grounding-triage.jsonl` holds the
+  287 consensus claims. It uses the exact `task` text and the frozen
+  question that `src/verifier/triage.ts` sends.
+- **Validation.** All four row files pass `jeff-kit check-rows`, except one
+  real template file in the guard set; see upstream notes.
+
+| Backend (same rows, same harness path) | Accuracy | AUC | ECE | P ≥ 0.7: rows / truly supported | P ≤ 0.3: rows / supported |
+|---|---|---|---|---|---|
+| Constant "false" | 93.4% | n/a | n/a | n/a | n/a |
+| Kev-0.8B | 86.1% | 0.727 | 0.144 | 16 / 5 | 155 / 6 |
+| **Jeff base (`jeff-latest`)** | **93.7%** | **0.873** | 0.052 | **6 / 5** | 261 / 9 |
+| Jeff + `ground` (its own request shape) | 89.9% | 0.791 | 0.072 | 6 / 3 | 279 / 16 |
+
+- **Jeff base is the first classifier to beat the constant on our triage.**
+  It beats it on accuracy, and on Brier counted the same way for both.
+  Its "likely supported" band is right 5 times in 6; Kev's was right 5 in
+  16.
+- **Wording matters a lot.** The same model scored 78% when I asked my own
+  question wording, and 93.7% with triage's real question and criteria.
+  Change the frozen question only behind this eval.
+- **The real path works.** `patchwork-harness verify claude <session> --classify` with
+  `PATCHWORK_HARNESS_JEFF_URL` prints "classifier triage · jeff jeff-qwen3.5-0.8b ·
+  2 MISSED · 283 ms — routes, not verdicts". The exit code still comes
+  from L4.5 alone.
+- **Integration bug found and fixed.** Jeff serves one decision at a time
+  and answers an overlapping request with 529 "busy" (Retry-After: 1). It
+  does not queue. An eval at parallel 2 lost 100 of 287 decisions.
+  - The client now queues calls per local server URL and honours
+    Retry-After.
+  - The eval counts every failed call as wrong, never as right, which is
+    what exposed it.
+
+**Decision.** Jeff base is the recommended triage backend
+(`PATCHWORK_HARNESS_JEFF_URL`, model `jeff-latest`). It still never grants green.
+Kev-0.8B is retired from this role.

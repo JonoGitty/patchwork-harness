@@ -144,6 +144,15 @@ describe("runtime model availability", () => {
     expect(await mod.modelReach(byId("gpt-6-astra"))).toBe("unreachable");
   });
 
+  it("widens to the nearest tier when the step's own tier has only a dead vendor", async () => {
+    // workhorse = Sonnet only: with every Anthropic model excluded (account out
+    // of credit), a Sonnet step must still land on another vendor's model
+    const anthropic = ["claude-sonnet-5-5", "claude-sonnet-5", "claude-opus-5-5", "claude-opus-5", "claude-haiku-4-5", "claude-fable-5-1", "claude-mythos-5-1"];
+    const alt = await mod.fallbackModelFor("claude-sonnet-5", anthropic);
+    expect(alt).not.toBeNull();
+    expect(alt?.provider).not.toBe("anthropic");
+  });
+
   it("recognises the shapes of model-not-found errors", () => {
     expect(
       mod.isModelNotFoundError(
