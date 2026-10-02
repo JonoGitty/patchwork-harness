@@ -96,7 +96,7 @@ async function probeOpenAI() {
   const list = await http("https://api.openai.com/v1/models", { headers: H });
   const listed = (list.json?.data ?? []).map((m) => m.id).sort();
   const explicit = [
-    "gpt-6-sol", "gpt-6-luna", "gpt-6-terra", "gpt-6-astra", "gpt-6", "gpt-6-pro", "gpt-6-mini", "gpt-6-nano", "gpt-6-chat-latest", "gpt-6-codex", "o6", "o5", "o5-pro",
+    "gpt-6.1-sol", "gpt-6-sol", "gpt-6-luna", "gpt-6-terra", "gpt-6-astra", "gpt-6", "gpt-6-pro", "gpt-6-mini", "gpt-6-nano", "gpt-6-chat-latest", "gpt-6-codex", "o6", "o5", "o5-pro",
     "gpt-5.6", "gpt-5.6-sol", "gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-pro", "gpt-5.6-mini",
     "gpt-5.5", "gpt-5.5-pro", "gpt-5.5-mini", "gpt-5.5-nano", "gpt-5.5-codex",
     "gpt-5.4", "gpt-5.4-mini", "gpt-5.4-nano", "gpt-5.4-pro",

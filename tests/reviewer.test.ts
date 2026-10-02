@@ -112,7 +112,7 @@ describe("parseVerdict", () => {
 describe("pickReviewer", () => {
   const all = async () => "reachable";
   it("picks the first reviewer from a vendor that did none of the work", async () => {
-    expect((await pickReviewer(new Set(["anthropic"]), undefined, all))?.id).toBe("gpt-6-sol");
+    expect((await pickReviewer(new Set(["anthropic"]), undefined, all))?.id).toBe("gpt-6.1-sol");
     expect((await pickReviewer(new Set(["openai"]), undefined, all))?.id).toBe("claude-sonnet-5");
     expect((await pickReviewer(new Set(["anthropic", "openai"]), undefined, all))?.id).toBe(
       "gemini-3.1-pro-preview",

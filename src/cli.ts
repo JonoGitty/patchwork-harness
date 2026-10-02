@@ -38,7 +38,7 @@ import { StdoutJsonReporter } from "./util/json_reporter.js";
 import { listKeys, setKey, unsetKey, envFilePath, KEY_NAMES } from "./util/key_store.js";
 import { startRepl } from "./cli/repl.js";
 
-const VERSION = "0.2.0";
+const VERSION = "0.3.0";
 
 const program = new Command();
 program
@@ -1181,6 +1181,77 @@ program
       process.stdout.write(text + "\n");
       log.cost(resp.cost_usd ?? 0, { in: resp.usage.input_tokens, out: resp.usage.output_tokens }, resp.duration_ms);
     }
+  });
+
+// ============== approve (cross-vendor check before publishing; the tag) ==============
+program
+  .command("approve [file]")
+  .description(
+    "The check before you publish: a model from a different vendor reads a draft " +
+    "issue, PR description or commit message against your evidence, then approves " +
+    "it or lists what to fix. An approved draft is printed with the \"Patchwork " +
+    "Harness approved\" tag, ready for `gh issue create --body-file -`. " +
+    "If [file] is omitted or '-', reads the draft from stdin.",
+  )
+  .option("--as <kind>", "issue | pr | commit | text - the form the tag takes", "issue")
+  .option("-e, --evidence <file>", "what the draft's claims rest on (repeatable)", (v: string, acc: string[]) => [...acc, v], [] as string[])
+  .option("-m, --model <id>", "reviewer model (default: the first reachable `reviewer` from another vendor)")
+  .option("--written-by <vendors>", "comma-separated vendor(s) that wrote the draft (default: the executor's)")
+  .option("--no-tag", "check only; print the draft without the tag (or set PATCHWORK_HARNESS_TAG=off)")
+  .option("--json", "emit the result as JSON")
+  .action(async (file: string | undefined, opts) => {
+    // stdout carries only the draft (or the JSON), so it pipes straight into gh/git.
+    setSilentStdout(true);
+    const kinds = ["issue", "pr", "commit", "text"] as const;
+    if (!kinds.includes(opts.as)) {
+      log.error(`--as must be one of ${kinds.join(", ")} (got ${opts.as})`);
+      process.exit(2);
+    }
+    const draft =
+      file && file !== "-"
+        ? readFileSync(file, "utf8")
+        : await new Promise<string>((resolve) => {
+            let data = "";
+            process.stdin.setEncoding("utf8");
+            process.stdin.on("data", (c) => { data += c; });
+            process.stdin.on("end", () => resolve(data));
+          });
+    if (!draft.trim()) {
+      log.error("approve: the draft is empty");
+      process.exit(2);
+    }
+    const evidence = (opts.evidence as string[]).map((f) => ({ name: f, text: readFileSync(f, "utf8") }));
+    const { approve } = await import("./review/approve.js");
+    let r;
+    try {
+      r = await approve({
+        draft,
+        kind: opts.as,
+        evidence,
+        model: opts.model,
+        writtenBy: opts.writtenBy ? String(opts.writtenBy).split(",").map((v: string) => v.trim()) : undefined,
+        tag: opts.tag,
+      });
+    } catch (e) {
+      log.error(`approve: ${(e as Error).message}`);
+      process.exit(2);
+    }
+    if (opts.json) {
+      process.stdout.write(JSON.stringify(r) + "\n");
+    } else {
+      for (const c of r.concerns)
+        process.stderr.write(`${c.severity.toUpperCase().padEnd(6)} ${c.issue}${c.quote ? `\n       "${c.quote}"` : ""}\n`);
+      if (r.unparsed) process.stderr.write(`could not read the reviewer's answer:\n${r.unparsed}\n`);
+      const how = `${r.reviewer}${r.cross_vendor ? "" : ", same vendor as the writer"}`;
+      if (r.approved) {
+        process.stdout.write(r.text.endsWith("\n") ? r.text : `${r.text}\n`);
+        log.ok(`approved by ${how}${r.tagged ? "; tagged" : r.cross_vendor ? "; tag off" : "; not tagged (not cross-vendor)"}`);
+      } else {
+        log.error(`not approved by ${how}: fix the concerns above and run it again`);
+      }
+      log.cost(r.cost_usd, {});
+    }
+    process.exit(r.approved ? 0 : 1);
   });
 
 // ============== review (multi-model adversarial security review) ==============

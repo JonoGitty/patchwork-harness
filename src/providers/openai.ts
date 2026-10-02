@@ -16,9 +16,11 @@ import { type Price, priceForModel } from "./pricing.js";
 
 // Fallback per-million pricing for ids the catalog (config/models.yml)
 // does not list (dated snapshots). Verified against
-// developers.openai.com/api/docs/pricing on 7 Sept 2026.
+// developers.openai.com/api/docs/pricing on 7 Sept 2026 (gpt-6.1-sol on
+// 2 Oct 2026).
 const PRICING: Record<string, Price> = {
   "gpt-6-astra": { in: 10.0, out: 50.0 },
+  "gpt-6.1-sol": { in: 2.0, out: 10.0 },
   "gpt-6-sol": { in: 2.0, out: 10.0 },
   "gpt-6-luna": { in: 0.1, out: 0.5 },
   "gpt-5.6-sol": { in: 4.0, out: 20.0 },
@@ -40,6 +42,7 @@ const PRICING: Record<string, Price> = {
 const LONG_CONTEXT_TOKENS = 272_000;
 const LONG_CONTEXT: Record<string, Price> = {
   "gpt-6-astra": { in: 20.0, out: 75.0 },
+  "gpt-6.1-sol": { in: 4.0, out: 15.0 },
   "gpt-6-sol": { in: 4.0, out: 15.0 },
   "gpt-6-luna": { in: 0.2, out: 0.75 },
   "gpt-5.6-sol": { in: 8.0, out: 30.0 },

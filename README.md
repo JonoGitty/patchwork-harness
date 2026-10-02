@@ -81,6 +81,8 @@ The independent reviewer agreed with the hidden check on **15 / 16** runs and fl
 | gpt-6-sol | 8 / 8 | 3 / 4 | 0.014 |
 | gpt-6-luna | 7 / 8 | 3 / 4 | 0.0007 |
 
+GPT-6.1 Sol was re-run against GPT-6 Sol on the same suite on 2 Oct, with each case reviewed twice. GPT-6.1 Sol flagged all 16 bad-case reviews and passed all 8 good-case reviews, at $0.011 a review. GPT-6 Sol flagged all 16 bad-case reviews too, but also flagged 2 of the 8 good ones. GPT-6.1 Sol is now the default reviewer.
+
 Small samples. The direction matches published harness research, but the evidence is honestly thin. Run your own: `patchwork-harness eval run starter --configs baseline,gate,gate+review --trials 4`.
 
 **Skipping the planner on one-pass jobs** (`--lane direct`). The planner splits every job into about 3 steps of 5 tool turns each. On jobs that don't need that, one direct step does better. Same model (GPT-6 Sol), same build, 16 runs per arm:
@@ -208,11 +210,25 @@ Routing is by **tier**, not brand: flagship coders for hard steps, workhorses fo
 | `verify file\|session\|claude\|exam` | The L4.5 verifier (`--classify` for triage) |
 | `eval run\|review\|classifier\|list` | Task suites, reviewer calibration, and classifier scoring on labelled rows (Jeff adapter-kit format) |
 | `route "<goal>"` | Preview the lane `--lane auto` would take, and why |
+| `approve [file]` | The check before you publish: a model from another vendor reads a draft issue, PR or commit message against your evidence (`-e`), then approves it or lists what to fix. Only an approved draft is printed, with the tag |
 | `rewind <session>` | Checkpoints |
 | `mcp` | MCP server |
 | `models` · `doctor` · `keys` · `ls` · `show` · `tail` · `web` · `cockpit` · `resume` | Everything else |
 
 Everything is also available as `pwh`.
+
+## The Patchwork Harness tag
+
+What the harness publishes carries one line saying how the harness was involved. The tag never claims more than happened:
+
+- **Approved:** text that passed `approve`, meaning a reviewer from a vendor that did not write it approved it, with no high or medium concern. A commit gets `Approved-by: Patchwork Harness, cross-vendor review by <model>`. An issue or PR gets a `✓ Patchwork Harness approved` footer.
+- **Made with:** commits and PRs the agent makes during a run. These land before the test gate and the L5 review, so they get `Made-with: Patchwork Harness`, never "approved".
+
+```bash
+patchwork-harness approve draft.md -e results.json | gh issue create --title "…" --body-file -
+```
+
+Commit tags are git trailers, so `git log --format='%(trailers)'` reads them. The tag is on by default. Turn it off with `PATCHWORK_HARNESS_TAG=off`, in your environment or `~/.patchwork-harness/.env`, or with `--no-tag`.
 
 ## Configuration
 

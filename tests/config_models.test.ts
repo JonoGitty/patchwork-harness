@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { loadModelCapabilities, loadModels, roleList } from "../src/config.js";
+import { openaiCost } from "../src/providers/openai.js";
 import { priceForModel } from "../src/providers/pricing.js";
 
 describe("config/models.yml (refreshed 2026-09-28)", () => {
@@ -84,5 +85,17 @@ describe("config/models.yml (refreshed 2026-09-28)", () => {
     expect(priceForModel("gpt-6-luna")).toEqual({ in: 0.1, out: 0.5 });
     expect(priceForModel("grok-4.7")).toEqual({ in: 2, out: 6 });
     expect(priceForModel("claude-sonnet-5-5")).toEqual({ in: 2, out: 10 });
+  });
+
+  it("gpt-6.1-sol is priced as itself, not as the unknown-priced gpt-6 (2 Oct)", () => {
+    // Before it was catalogued, "gpt-6.1-sol" matched the `gpt-6` entry by
+    // prefix, which has no price, so every call went on the ledger at $0.
+    expect(by("gpt-6.1-sol")).toMatchObject({
+      availability: "verified",
+      verified_on: "2026-10-02",
+    });
+    expect(priceForModel("gpt-6.1-sol")).toEqual({ in: 2, out: 10 });
+    expect(openaiCost("gpt-6.1-sol", 100_000, 100_000)).toBeCloseTo(0.1 * 2 + 0.1 * 10);
+    expect(openaiCost("gpt-6.1-sol", 300_000, 100_000)).toBeCloseTo(0.3 * 4 + 0.1 * 15);
   });
 });

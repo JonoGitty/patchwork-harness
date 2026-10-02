@@ -12,6 +12,10 @@
 #                do not have access" is ambiguous - unreachable-on-this-key,
 #                never "nonexistent".
 #
+# 2026-10-02: + gpt-6.1-sol (docs/research/model-probe-2026-10-02.json). Until
+# then it fell through to the `unknown`-priced gpt-6 entry by prefix, so its
+# calls were ledgered at $0.
+#
 # Refreshed 2026-09-28 (evidence: docs/research/model-probe-2026-09-28.json;
 # previous refresh 2026-09-07). New since then: claude-opus-5-5, gpt-6-sol,
 # gpt-6-luna, grok-4.7. Dropped as strictly dominated: claude-opus-4-8 (Opus 5
@@ -88,7 +92,7 @@ models:
     strengths: [classification, planning, cheap_oneshot]
     notes: "Alias of claude-haiku-4-5-20251001; 'the fastest model with near-frontier intelligence'; 64k output"
 
-  # ── OpenAI — developers.openai.com/api/docs/pricing (28 Sept 2026). Requests over
+  # ── OpenAI — developers.openai.com/api/docs/pricing (28 Sept 2026; gpt-6.1-sol 2 Oct). Requests over
   #    272k input tokens bill at the long-context tier (handled in the adapter). ──
   - id: gpt-6-pro
     provider: openai
@@ -118,6 +122,16 @@ models:
     verified_on: "2026-09-28"
     strengths: [hard_reasoning, hard_coding, security_review, flagship, large_context]
     notes: "'Our most capable model, built for the hardest end-to-end work'; 128k output; >272k input bills $20/$75; works on chat completions"
+
+  - id: gpt-6.1-sol
+    provider: openai
+    context_window: 1050000
+    cost_per_m_in: 2.00
+    cost_per_m_out: 10.00
+    availability: verified
+    verified_on: "2026-10-02"
+    strengths: [hard_coding, agentic_loops, balanced, large_context, structured_output]
+    notes: "Released 29 Sept 2026 - the GPT-6 Sol upgrade, 'near-Astra performance at a lower cost for complex coding, computer use, and professional work'; same $2/$10 as GPT-6 Sol with cached input halved ($0.10); vendor-reported DeepSWE v1.1 75.2% at high effort (Astra 74.1%); 922k input cap, 128k output; >272k input bills $4/$15; reasoning effort low-max (no none/minimal)"
 
   - id: gpt-6-sol
     provider: openai
@@ -357,8 +371,13 @@ defaults:
   # 8 of them bugs that pass the visible tests): gpt-6-sol caught 8/8 bugs with
   # 1 arguable false alarm at $0.014/review; sonnet-5 12/12 at $0.040;
   # gemini-3.1-pro-preview right on all 8 it served but 4/12 calls errored.
+  # 2 Oct 2026, same suite, each case reviewed twice: gpt-6.1-sol flagged all
+  # 16 bad-case reviews and passed all 8 good-case reviews ($0.011/review);
+  # gpt-6-sol flagged all 16 bad but also 2 of the 8 good ($0.013/review). So
+  # 6.1 leads; 6-sol is its fallback. Results: ~/.patchwork-harness/evals/*-l5cal.json.
   reviewer:
-    - gpt-6-sol                      # reviews Anthropic work (the default executor)
+    - gpt-6.1-sol                    # reviews Anthropic work (the default executor)
+    - gpt-6-sol                      # if 6.1 is unreachable
     - claude-sonnet-5                # reviews OpenAI work
     - gemini-3.1-pro-preview         # reviews work that used both
   security_reviewer:
@@ -369,5 +388,6 @@ defaults:
     - claude-fable-5-1               # Anthropic's deepest reasoner; $10/$50
     - gemini-3.1-pro-preview         # Google's heaviest reasoner; $2/$12
     - claude-opus-5-5                # matches/beats Fable on the vendor's coding benchmarks at 40% of the price - the Anthropic fallback lane
+    - gpt-6.1-sol                    # near-Astra at a fifth of the price; the L5 calibration's best (2 Oct)
     - gpt-6-sol
     - grok-4.7

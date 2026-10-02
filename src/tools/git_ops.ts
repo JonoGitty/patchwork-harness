@@ -1,5 +1,6 @@
 import { execa } from "execa";
 import { z } from "zod";
+import { tagEnabled, withTag } from "../core/tag.js";
 import type { Tool, RiskAssessment } from "./base.js";
 
 const Action = z.enum(["status", "diff", "add", "commit", "push", "branch", "pr_create"]);
@@ -14,6 +15,21 @@ const Input = z.object({
 });
 type In = z.infer<typeof Input>;
 
+/**
+ * The Patchwork Harness tag on what this tool publishes (src/core/tag.ts):
+ * a `Made-with` trailer on commits and a footer on PR bodies. "made", never
+ * "approved" - these land mid-run, before the gate or L5 review has run.
+ * PATCHWORK_HARNESS_TAG=off turns it off.
+ */
+function tagged(i: In): In {
+  if (!tagEnabled()) return i;
+  if (i.action === "commit" && i.message)
+    return { ...i, message: withTag(i.message, "commit", { level: "made" }) };
+  if (i.action === "pr_create")
+    return { ...i, pr_body: withTag(i.pr_body ?? "", "pr", { level: "made" }) };
+  return i;
+}
+
 function classify(action: z.infer<typeof Action>): RiskAssessment {
   if (action === "push") return { level: "high", flags: ["network_request"] };
   if (action === "pr_create") return { level: "high", flags: ["network_request"] };
@@ -27,7 +43,8 @@ export const gitOpsTool: Tool<In, { action: string; output: string; success: boo
     "Perform a git or gh action: status, diff, add, commit, push, branch, pr_create. Each action prompts unless explicitly auto-approved.",
   inputSchema: Input,
   assess: (i) => classify(i.action),
-  preview: (i) => {
+  preview: (raw) => {
+    const i = tagged(raw);
     const cmd =
       i.action === "commit"
         ? `git commit -m ${JSON.stringify(i.message ?? "")}`
@@ -40,7 +57,8 @@ export const gitOpsTool: Tool<In, { action: string; output: string; success: boo
               : `git ${i.action}`;
     return { description: cmd, details: { command: cmd } };
   },
-  async run(input, ctx) {
+  async run(raw, ctx) {
+    const input = tagged(raw);
     const args: string[][] = [];
     let bin = "git";
     switch (input.action) {
@@ -68,14 +86,7 @@ export const gitOpsTool: Tool<In, { action: string; output: string; success: boo
       case "pr_create":
         bin = "gh";
         if (!input.pr_title) throw new Error("pr_create requires a title");
-        args.push([
-          "pr",
-          "create",
-          "--title",
-          input.pr_title,
-          "--body",
-          input.pr_body ?? "",
-        ]);
+        args.push(["pr", "create", "--title", input.pr_title, "--body", input.pr_body ?? ""]);
         break;
     }
     let combined = "";

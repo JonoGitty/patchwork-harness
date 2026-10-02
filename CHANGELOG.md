@@ -2,6 +2,21 @@
 
 All notable changes to Patchwork Harness. Versions follow [SemVer](https://semver.org/); each release's source converts to Apache 2.0 three years after it ships (see [LICENSE](LICENSE)).
 
+## [0.3.0] — 2026-10-02
+
+### Added
+- **GPT-6.1 Sol** (`gpt-6.1-sol`) is in the catalog.
+  - Verified by a real call; priced from OpenAI's pricing page at $2/$10, or $4/$15 above 272k input.
+  - Before this it matched the unknown-priced `gpt-6` entry by prefix, so its spend went on the ledger at $0.
+  - It leads the `reviewer` role. In a two-trial run on the reviewer calibration suite it passed 8/8 good-case reviews, against 6/8 for GPT-6 Sol. Both flagged all 16 bad-case reviews.
+- **`approve [file]`**: a model from another vendor reads a draft issue, PR or commit message against your evidence, then approves it or lists what to fix.
+  - A reviewer that approves while listing a high or medium concern is not believed.
+  - An unreadable answer is never an approval.
+  - stdout carries only the approved text, so it pipes into `gh`.
+- **The Patchwork Harness tag**, on by default (`PATCHWORK_HARNESS_TAG=off` or `--no-tag` turns it off).
+  - Text that passed `approve` gets "approved". Commits and PRs made during a run get "made with".
+  - On commits it is a git trailer, joined to any existing trailer block.
+
 ## [0.2.0] — 2026-10-01
 
 ### Classifiers in the harness, measured first

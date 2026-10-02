@@ -1,6 +1,6 @@
 # ADR-0020 — patchwork-harness as a Claude Code mod
 
-**Status:** built and statically validated; NOT yet run live (mods are switched off remotely for this account) · 2026-10-01
+**Status:** built and statically validated; shipped in Patchwork Harness v0.2.0; NOT yet run live (mods are switched off remotely for this account) · 2026-10-01
 **Owner:** maintainers · drafted with Claude
 **Depends on:** ADR-0011/0012 (L4.5 verify), ADR-0013 (classifiers, Jeff), ADR-0019 (injection guard)
 

@@ -206,6 +206,22 @@ models:
       - "availability: unverified; price unknown"
     typical_cost_per_step_usd: 0.07
 
+  - id: gpt-6.1-sol
+    tier: flagship
+    speed: fast
+    relative_cost: medium
+    best_for:
+      - "Near-Astra coding and agentic work at a fifth of Astra's price ($2/$10) - vendor-reported DeepSWE v1.1 75.2% at high effort vs Astra's 74.1%"
+      - "The non-Claude voice on serious coding and review: same price as GPT-6 Sol, newer, and cached input is half the price ($0.10)"
+      - "Backend APIs, business logic, strict-schema codegen - strong native structured outputs"
+    avoid_for:
+      - "Classification and cheap one-shots (GPT-6 Luna is 20x cheaper)"
+      - "Calls that set reasoning effort to none or minimal - it rejects both"
+    quirks:
+      - "OpenAI's GPT-6 Sol upgrade (29 Sept 2026); 1.05M context, 922k input cap, 128k output; reasoning effort low-max, default medium"
+      - "$2/$10 under 272k input, $4/$15 above; function tools go through the Responses API like every GPT-6"
+    typical_cost_per_step_usd: 0.014
+
   - id: gpt-6-sol
     tier: flagship
     speed: fast
