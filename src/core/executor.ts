@@ -777,7 +777,12 @@ export async function runStep(input: RunStepInput): Promise<StepResult> {
     target: { step: step.title },
     provenance: { note: "max_tool_turns reached" },
   });
-  return finalize("completed", undefined);
+  // ADR-0022: it is recorded as completed (later steps still run), but
+  // flagged, so the summary says so and `patchwork-harness continue` can finish it.
+  log.warn(
+    `step "${step.title}" used all ${step.max_tool_turns} tool turns without saying it was done`,
+  );
+  return { ...finalize("completed", undefined), turn_cap: true };
 
   function finalize(
     status: "completed" | "failed" | "denied" | "bedrock_aborted",

@@ -23,6 +23,7 @@ import {
   snapshot as budgetSnapshot,
   loadBudgetConfig,
 } from "./budget.js";
+import { isContinuable } from "./continue.js";
 import { runStep } from "./executor.js";
 import { type HarnessOptions, checkpoint, repairDescription, runGate } from "./harness.js";
 import { DEFAULT_GUARD_THRESHOLD, type InjectionGuard, guardReady } from "./guard.js";
@@ -73,6 +74,13 @@ export interface OneShotInput {
   laneThreshold?: number;
   /** The direct lane's model (default: the executor role). */
   laneModel?: string;
+  /**
+   * `patchwork-harness continue` (ADR-0022, src/core/continue.ts). `context` (what the
+   * earlier session did) reaches the planner and every step. With `steps`
+   * the run resumes the earlier plan from there: no lane decision, world
+   * view, lessons, planner or critic.
+   */
+  continuation?: { from: string; context: string; steps?: Step[] };
 }
 
 export async function oneShot(input: OneShotInput): Promise<{
@@ -103,8 +111,14 @@ export async function oneShot(input: OneShotInput): Promise<{
     throw e;
   }
 
-  audit.emit({ action: "session_start", target: { goal: input.goal }, content: input.goal });
+  const continuedFrom = input.continuation?.from;
+  audit.emit({
+    action: "session_start",
+    target: { goal: input.goal, ...(continuedFrom ? { continued_from: continuedFrom } : {}) },
+    content: input.goal,
+  });
   reporter?.emit("session_start", {
+    ...(continuedFrom ? { continued_from: continuedFrom } : {}),
     goal: input.goal,
     cwd: input.cwd,
     permission_mode: input.permission_mode,
@@ -156,7 +170,11 @@ export async function oneShot(input: OneShotInput): Promise<{
     permission_mode: input.permission_mode,
     status: "in_progress",
     started_at: new Date().toISOString(),
+    pid: process.pid,
+    ...(continuedFrom ? { continued_from: continuedFrom } : {}),
   };
+  // Resuming an earlier plan (ADR-0022) skips routing and planning entirely.
+  const resume = input.continuation?.steps?.length ? input.continuation : undefined;
 
   await runPluginHook("onSessionStart", state);
 
@@ -214,7 +232,7 @@ export async function oneShot(input: OneShotInput): Promise<{
 
     // INTENT LANE (ADR-0018). World view, lessons and the critic only feed
     // the planner, so the direct lane skips all of them with it.
-    const laneMode: LaneMode = input.lane ?? "planned";
+    const laneMode: LaneMode = resume ? "planned" : (input.lane ?? "planned");
     let route: IntentRoute | undefined;
     if (laneMode === "auto") {
       route = await routeIntent(input.goal, {
@@ -282,9 +300,9 @@ export async function oneShot(input: OneShotInput): Promise<{
     }
 
     // SMART CONDUCTOR — Layer 1 + Layer 2: world view + lessons (in parallel)
-    const worldViewEnabled = lane === "planned" && input.worldViewEnabled !== false;
-    const lessonsEnabled = lane === "planned" && input.lessonsEnabled !== false;
-    const criticEnabled = lane === "planned" && input.criticEnabled !== false;
+    const worldViewEnabled = !resume && lane === "planned" && input.worldViewEnabled !== false;
+    const lessonsEnabled = !resume && lane === "planned" && input.lessonsEnabled !== false;
+    const criticEnabled = !resume && lane === "planned" && input.criticEnabled !== false;
 
     // Memory spine planner auto-injection is OFF by default after the
     // 2026-05-27 security audit (prompt-injection amplification risk:
@@ -296,6 +314,7 @@ export async function oneShot(input: OneShotInput): Promise<{
     // top of the data, not the bottom.
     const envOptIn = process.env.PATCHWORK_HARNESS_ENABLE_CONTEXT_INJECTION === "1";
     const contextEnabled =
+      !resume &&
       lane === "planned" &&
       (input.contextEnabled === true || (input.contextEnabled !== false && envOptIn));
     const [worldViewRaw, similarSessions, contextPacket] = await Promise.all([
@@ -309,9 +328,12 @@ export async function oneShot(input: OneShotInput): Promise<{
     ]);
     // Compose: prior conversation -> spine memory -> world view. Spine before
     // world view because spine entries are higher-signal (provenance-tagged).
-    const parts = [input.priorContext?.trim(), contextPacket, worldViewRaw].filter(
-      (s) => s && s.length > 0,
-    );
+    const parts = [
+      input.priorContext?.trim(),
+      input.continuation?.context,
+      contextPacket,
+      worldViewRaw,
+    ].filter((s) => s && s.length > 0);
     const worldView = parts.join("\n\n").trim();
     if (contextPacket) {
       audit.emit({
@@ -343,7 +365,19 @@ export async function oneShot(input: OneShotInput): Promise<{
     const unattended = input.permission_mode === "auto";
     const modelDefaults = loadModels().defaults;
     let plan: Plan;
-    if (lane === "direct") {
+    if (resume?.steps) {
+      log.step(
+        "Continuing",
+        `session ${resume.from}: its remaining ${resume.steps.length} step(s), no new plan`,
+      );
+      const { reachable } = await reachableModels(loadModels().models);
+      plan = {
+        goal: input.goal,
+        reasoning: `continues session ${resume.from} from where it stopped (ADR-0022)`,
+        steps: await enforceReachable(resume.steps, reachable),
+        estimated_cost_usd: 0,
+      };
+    } else if (lane === "direct") {
       log.step("Direct lane", "no planner or critic: one executor step");
       const catalog = loadModels().models;
       const exec = input.laneModel ?? modelDefaults.executor;
@@ -386,6 +420,7 @@ export async function oneShot(input: OneShotInput): Promise<{
       });
     }
     state.plan = plan;
+    persistSession(state); // from here on a killed run can be continued
     audit.emit({
       action: "plan_ready",
       target: { steps: plan.steps.length },
@@ -412,6 +447,8 @@ export async function oneShot(input: OneShotInput): Promise<{
     if (input.dryRun) {
       log.warn("dry-run — not executing");
       finishSession(state, audit, "completed");
+      if (!reporter)
+        log.info(`${chalk.bold("↻")} ${chalk.bold("patchwork-harness continue")} executes this plan`);
       return { state, audit };
     }
 
@@ -471,11 +508,14 @@ export async function oneShot(input: OneShotInput): Promise<{
         mode: input.permission_mode,
         // Human decisions carry more weight than step summaries — give them
         // more room before truncation.
-        systemContext: state.results
-          .map(
+        systemContext: [
+          input.continuation?.context,
+          ...state.results.map(
             (r) =>
               `${r.step.title}: ${r.output_summary.slice(0, r.step.pause_for_human ? 600 : 200)}`,
-          )
+          ),
+        ]
+          .filter(Boolean)
           .join("\n"),
         reporter,
         human,
@@ -484,6 +524,7 @@ export async function oneShot(input: OneShotInput): Promise<{
       });
       state.results.push(result);
       state.total_cost_usd = budget.spent_usd;
+      persistSession(state);
       log.cost(
         result.cost_usd,
         { in: result.tokens_in, out: result.tokens_out },
@@ -706,8 +747,15 @@ export async function oneShot(input: OneShotInput): Promise<{
       ...(state.review
         ? { review: { verdict: state.review.verdict, model: state.review.model } }
         : {}),
+      continuable: isContinuable(state),
     });
     if (!reporter) printSummary(state.results, state.total_cost_usd, budget, state);
+    // A plan the user declined is not "unfinished work".
+    const declined = endStatus === "denied" && state.results.length === 0;
+    if (!reporter && !declined && isContinuable(state))
+      log.info(
+        `${chalk.bold("↻")} unfinished work is recorded: ${chalk.bold("patchwork-harness continue")} picks it up (or --session ${sessionId})`,
+      );
     return { state, audit };
   } catch (e) {
     if (state.status === "in_progress") {

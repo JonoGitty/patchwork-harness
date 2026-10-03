@@ -2,6 +2,19 @@
 
 All notable changes to Patchwork Harness. Versions follow [SemVer](https://semver.org/); each release's source converts to Apache 2.0 three years after it ships (see [LICENSE](LICENSE)).
 
+## [0.4.0] — 2026-10-03
+
+### Added
+- **`continue [instruction]`** (also `run --continue`, MCP `harness_continue`): picks up the last run in this directory, or `--session <id>`, where it stopped.
+  - **Resume.** A run that stopped part-way re-runs its own plan from the first unfinished step, with no new planning. That covers a failed or refused step, the spend ceiling, a killed process, or a dry run.
+  - **Follow up.** A run whose steps all ran gets one direct step on what was left: a step out of tool turns, a failing test gate, or an INCOMPLETE review. An instruction rides along, or is the follow-up itself on a run that finished clean.
+  - The earlier run's gate and review apply again.
+  - Tested live: a real run was killed after step 1, then continued twice to completion, for about $0.006.
+
+### Fixed
+- **A step that used all its tool turns was recorded as completed, with no warning.** It is now flagged (`turn_cap`) and warned about, and a resume gives it more turns.
+- **The session file was written only when a run ended,** so a killed run left nothing to pick up. It is now saved after the plan and after every step, atomically.
+
 ## [0.3.0] — 2026-10-02
 
 ### Added

@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { TOOLS, handle, summariseRun } from "../src/mcp/server.js";
+import { TOOLS, handle, runCommand, summariseRun } from "../src/mcp/server.js";
 import { PROJECT_ROOT } from "../src/util/paths.js";
 
 describe("patchwork-harness MCP server (ADR-0014)", () => {
@@ -48,6 +48,47 @@ describe("patchwork-harness MCP server (ADR-0014)", () => {
     })) as { result: { isError: boolean; content: Array<{ text: string }> } };
     expect(r.result.isError).toBe(true);
     expect(r.result.content[0]?.text).toContain("budget_usd must be between");
+  });
+
+  it("harness_continue (ADR-0022) needs confirm, and becomes `run --continue` with its options", async () => {
+    const r = (await handle({
+      jsonrpc: "2.0",
+      id: 7,
+      method: "tools/call",
+      params: { name: "harness_continue", arguments: { cwd: "C:\\tmp" } },
+    })) as { result: { isError: boolean; content: Array<{ text: string }> } };
+    expect(r.result.isError).toBe(true);
+    expect(r.result.content[0]?.text).toContain("harness_continue spends money");
+    expect(
+      runCommand(
+        {
+          cwd: "C:\\tmp",
+          confirm: true,
+          session_id: "ses_1",
+          instruction: "also add tests",
+          budget_usd: 1,
+        },
+        "continue",
+      ),
+    ).toEqual([
+      "run",
+      "--continue",
+      "also add tests",
+      "--session",
+      "ses_1",
+      "-u",
+      "--cwd",
+      "C:\\tmp",
+      "--budget",
+      "1",
+      "--verify",
+    ]);
+    // no session: the latest run in cwd; no instruction: just continue
+    expect(runCommand({ cwd: "C:\\tmp", confirm: true }, "continue").slice(0, 3)).toEqual([
+      "run",
+      "--continue",
+      "-u",
+    ]);
   });
 
   it("reports unknown methods and tools as JSON-RPC errors", async () => {

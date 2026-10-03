@@ -38,7 +38,7 @@ import { StdoutJsonReporter } from "./util/json_reporter.js";
 import { listKeys, setKey, unsetKey, envFilePath, KEY_NAMES } from "./util/key_store.js";
 import { startRepl } from "./cli/repl.js";
 
-const VERSION = "0.3.0";
+const VERSION = "0.4.0";
 
 const program = new Command();
 program
@@ -1386,7 +1386,17 @@ program
 program
   .command("one-shot [goal]", { isDefault: true })
   .alias("run")
-  .description("Plan and execute a goal end-to-end.")
+  .description(
+    "Plan and execute a goal end-to-end. `patchwork-harness continue [instruction]` (same as --continue) " +
+    "picks up the last run in this directory where it stopped.",
+  )
+  .option(
+    "-c, --continue",
+    "ADR-0022: pick up the last run in this directory where it stopped: resume its plan from the step that did not finish, " +
+    "or, if every step finished, follow up on what was left (a step out of tool turns, a failing --verify-cmd, an INCOMPLETE review). " +
+    "[goal] becomes an extra instruction; on a finished run it is the follow-up task",
+  )
+  .option("--session <id>", "with --continue: the session to continue (id or unique prefix; default: the latest in this directory)")
   .option("--auto", "widen auto-approval (skip prompts for everything below high-risk)")
   .option("--cautious", "narrow auto-approval (prompt for everything above none-risk)")
   .option("--dry-run", "plan only; do not execute")
@@ -1425,7 +1435,35 @@ program
   .option("--guard [p]", "ADR-0019: screen file, shell, search, git and memory output for prompt injection before the model reads it (Jeff guard adapter at PATCHWORK_HARNESS_JEFF_URL); flag at P(attack) >= p", )
   .option("--guard-withhold", "with --guard: withhold a flagged output from the model instead of flagging it (also withholds outputs the guard could not screen)")
   .option("--lane-model <id>", "the direct lane's model (default: the executor role). The planned lane routes small steps to cheaper tiers; the direct lane otherwise always uses the flagship")
-  .action(async (goal: string | undefined, opts) => {
+  .action(async (goal: string | undefined, opts, cmd) => {
+    // ADR-0022: --continue turns [goal] into an optional instruction and
+    // derives the real goal (and maybe the plan) from the earlier session.
+    let continuation: { from: string; context: string; steps?: import("./core/types.js").Step[] } | undefined;
+    const inherited: { verifyCmd?: string; review?: boolean } = {};
+    if (opts.continue || opts.session) {
+      const { ContinueError, findSession, planContinuation } = await import("./core/continue.js");
+      try {
+        const parent = findSession({ cwd: opts.cwd ?? process.cwd(), id: opts.session });
+        const c = planContinuation(parent, goal);
+        log.info(
+          `continuing ${chalk.bold(parent.sessionId)} (${parent.status}): ` +
+            (c.kind === "resume" ? `resuming at step ${c.at}, because ${c.why}` : `follow-up, because ${c.why}`),
+        );
+        continuation = { from: c.from, context: c.context, ...(c.kind === "resume" ? { steps: c.steps } : {}) };
+        goal = c.goal;
+        // The checks the earlier run asked for still apply unless overridden.
+        if (!opts.verifyCmd && parent.verification?.cmd) inherited.verifyCmd = parent.verification.cmd;
+        if (opts.review === undefined && !opts.reviewFix && parent.review) inherited.review = true;
+        if (inherited.verifyCmd) log.info(chalk.dim(`gate    ${inherited.verifyCmd} (from the earlier run)`));
+        if (inherited.review) log.info(chalk.dim("review  on (the earlier run was reviewed)"));
+        // A follow-up already has its context: one direct step unless --lane says otherwise.
+        if (c.kind === "follow_up" && cmd.getOptionValueSource("lane") !== "cli") opts.lane = "direct";
+      } catch (e) {
+        if (!(e instanceof ContinueError)) throw e;
+        log.error(e.message);
+        process.exit(1);
+      }
+    }
     // No goal? Drop into the REPL — `patchwork-harness` should "just work" like `claude`.
     if (!goal) {
       const budget = opts.budget === "auto" ? "auto" : Number(opts.budget);
@@ -1511,14 +1549,15 @@ program
         lane: opts.lane,
         laneThreshold: Number(opts.laneThreshold),
         laneModel: opts.laneModel,
+        continuation,
         harness: {
-          verifyCmd: opts.verifyCmd,
+          verifyCmd: opts.verifyCmd ?? inherited.verifyCmd,
           verifyTimeoutS: Number(opts.verifyTimeout) || 600,
           attempts: Number(opts.attempts) || 1,
           checkpoint: opts.checkpoint === true,
           loopGuard: opts.guardLoop === true,
           timeBudgetS: opts.timeBudget ? Number(opts.timeBudget) : undefined,
-          review: opts.review ?? (opts.reviewFix ? true : undefined),
+          review: opts.review ?? (opts.reviewFix ? true : inherited.review),
           reviewStrict: opts.reviewStrict === true,
           reviewFix: opts.reviewFix === true,
           guard:
@@ -1901,5 +1940,9 @@ if (process.argv.length <= 2 && process.stdout.isTTY && process.stdin.isTTY) {
   const { startCockpit } = await import("./tui/cockpit.js");
   await startCockpit({});
 } else {
-  program.parseAsync(process.argv);
+  // `patchwork-harness continue [instruction]` is `patchwork-harness run --continue [instruction]` (ADR-0022),
+  // so every run flag works on it; without this, "continue" would run as a goal.
+  const argv = [...process.argv];
+  if (argv[2] === "continue") argv.splice(2, 1, "run", "--continue");
+  program.parseAsync(argv);
 }

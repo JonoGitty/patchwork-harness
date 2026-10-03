@@ -167,6 +167,23 @@ Decision records for every layer live in [`DECISIONS/`](DECISIONS).
 | `--lane planned\|direct\|auto` · `--lane-model <id>` | Intent lane, and the direct lane's model (planned is the default) |
 | `--guard [p]` · `--guard-withhold` | Injection guard at P(attack) ≥ p (default 0.9); withhold instead of flag |
 
+## Pick up where it stopped
+
+`patchwork-harness continue` (or `run --continue`) picks up the last run in this directory, or `--session <id>`. It reads the saved session and does one of two things:
+
+- **Resume.** If the run stopped part-way, it re-runs that run's own plan from the first unfinished step, with no new planning. That covers a failed or refused step, the spend ceiling, a killed process, or a `--dry-run` you now want executed. The resumed step is told why the run stopped, and that files may already be partly changed.
+- **Follow up.** If every step ran but something was left over, one direct step works on exactly that. Leftovers are a step that ran out of tool turns, a `--verify-cmd` gate that still fails, or an INCOMPLETE review.
+
+```bash
+patchwork-harness continue                       # pick up the last run here
+patchwork-harness continue "use the v2 API"      # ...with an extra instruction
+patchwork-harness continue "now add a README"    # follow up on a run that finished
+```
+
+- The earlier run's test gate and review apply again, and its step summaries reach the new steps.
+- The session is saved after every step, so even a killed run can be continued. A step that runs out of tool turns is now flagged instead of passing as done, and it gets more turns when it is resumed.
+- A run that leaves work unfinished ends by telling you so.
+
 ## Use it from Claude Code (MCP)
 
 `patchwork-harness mcp` serves the harness over MCP, so Claude Code — including Remote Control sessions — drives it with typed tools:
@@ -175,7 +192,7 @@ Decision records for every layer live in [`DECISIONS/`](DECISIONS).
 claude mcp add patchwork-harness -s user -- node /path/to/patchwork-harness/bin/patchwork-harness.mjs mcp
 ```
 
-16 tools: `harness_plan`, `harness_run` (+ `harness_run_status`), `harness_verify_claude` / `_session` / `_file`, `harness_review`, `harness_ask`, `harness_eval`, `harness_checkpoints`, `harness_rewind`, `harness_models`, `harness_status`, `harness_sessions`, `harness_show`, `harness_exam`. Anything that spends money or changes files requires `confirm: true`; background runs close stdin, so every permission prompt resolves to **deny**.
+17 tools: `harness_plan`, `harness_run` (+ `harness_run_status`), `harness_continue`, `harness_verify_claude` / `_session` / `_file`, `harness_review`, `harness_ask`, `harness_eval`, `harness_checkpoints`, `harness_rewind`, `harness_models`, `harness_status`, `harness_sessions`, `harness_show`, `harness_exam`. Anything that spends money or changes files requires `confirm: true`; background runs close stdin, so every permission prompt resolves to **deny**.
 
 Audit a Claude Code session's own answer against its tool outputs: `pwh verify claude --classify`.
 
@@ -209,6 +226,7 @@ Routing is by **tier**, not brand: flagship coders for hard steps, workhorses fo
 | `review <paths>` | Cross-vendor adversarial review, merged and L4.5-checked |
 | `verify file\|session\|claude\|exam` | The L4.5 verifier (`--classify` for triage) |
 | `eval run\|review\|classifier\|list` | Task suites, reviewer calibration, and classifier scoring on labelled rows (Jeff adapter-kit format) |
+| `continue [instruction]` | Pick up the last run where it stopped: resume its plan, or follow up on what was left (`--session <id>`, all run flags) |
 | `route "<goal>"` | Preview the lane `--lane auto` would take, and why |
 | `approve [file]` | The check before you publish: a model from another vendor reads a draft issue, PR or commit message against your evidence (`-e`), then approves it or lists what to fix. Only an approved draft is printed, with the tag |
 | `rewind <session>` | Checkpoints |

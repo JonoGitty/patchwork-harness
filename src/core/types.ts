@@ -44,6 +44,8 @@ export interface StepResult {
   duration_ms: number;
   tool_calls: number;
   error?: string;
+  /** The step used all its tool turns without saying it was done (ADR-0022). */
+  turn_cap?: boolean;
 }
 
 export interface SessionState {
@@ -84,6 +86,10 @@ export interface SessionState {
   };
   /** L5 reviewer verdict (ADR-0016); absent unless --review. */
   review?: import("./reviewer.js").ReviewResult;
+  /** The process running this session; a dead pid on an in_progress session means it was killed. */
+  pid?: number;
+  /** `patchwork-harness continue` (ADR-0022): the session this one picked up from. */
+  continued_from?: string;
 }
 
 export type ProviderResolver = (name: Step["provider"]) => Provider;

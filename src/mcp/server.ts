@@ -81,21 +81,35 @@ function loadIndex(): Record<string, string> {
   }
 }
 
-/** Start a run in the background; wait (briefly) for its session id. */
-async function startRun(args: Json): Promise<string> {
+/**
+ * The CLI arguments for a background run, after the money checks. `continue`
+ * (ADR-0022) picks up an earlier session: the goal is an optional
+ * instruction, and session_id defaults to the latest run in cwd.
+ */
+export function runCommand(args: Json, kind: "run" | "continue" = "run"): string[] {
+  const tool = kind === "run" ? "harness_run" : "harness_continue";
   if (args.confirm !== true)
     throw new ToolError(
-      "harness_run spends money and executes tools: call it again with confirm: true once the user has agreed (use harness_plan first to show them the plan)",
+      `${tool} spends money and executes tools: call it again with confirm: true once the user has agreed${kind === "run" ? " (use harness_plan first to show them the plan)" : ""}`,
     );
-  const goal = str(args.goal, "goal");
   const cwd = str(args.cwd, "cwd");
   const budget = typeof args.budget_usd === "number" ? args.budget_usd : 0.5;
   if (!(budget > 0 && budget <= MAX_RUN_BUDGET))
     throw new ToolError(`budget_usd must be between 0 and ${MAX_RUN_BUDGET}`);
-  mkdirSync(RUNS_DIR, { recursive: true });
-  const log = join(RUNS_DIR, `${new Date().toISOString().replace(/[:.]/g, "-")}.ndjson`);
-  const fd = openSync(log, "a");
-  const cmd = ["run", goal, "-u", "--cwd", cwd, "--budget", String(budget)];
+  const cmd =
+    kind === "run"
+      ? ["run", str(args.goal, "goal")]
+      : [
+          "run",
+          "--continue",
+          ...(typeof args.instruction === "string" && args.instruction.trim()
+            ? [args.instruction]
+            : []),
+          ...(typeof args.session_id === "string" && args.session_id.trim()
+            ? ["--session", args.session_id]
+            : []),
+        ];
+  cmd.push("-u", "--cwd", cwd, "--budget", String(budget));
   if (typeof args.mode === "string") cmd.push("--mode", args.mode);
   if (args.verify !== false) cmd.push("--verify");
   if (typeof args.verify_cmd === "string" && args.verify_cmd.trim())
@@ -108,6 +122,16 @@ async function startRun(args: Json): Promise<string> {
   else if (typeof args.review === "string" && args.review.trim()) cmd.push("--review", args.review);
   if (args.review_strict === true) cmd.push("--review-strict");
   if (args.review_fix === true) cmd.push("--review-fix");
+  return cmd;
+}
+
+/** Start a run in the background; wait (briefly) for its session id. */
+async function startRun(args: Json, kind: "run" | "continue" = "run"): Promise<string> {
+  const cmd = runCommand(args, kind);
+  const budget = cmd[cmd.indexOf("--budget") + 1];
+  mkdirSync(RUNS_DIR, { recursive: true });
+  const log = join(RUNS_DIR, `${new Date().toISOString().replace(/[:.]/g, "-")}.ndjson`);
+  const fd = openSync(log, "a");
   const child = spawn(process.execPath, [BIN, ...cmd], {
     stdio: ["ignore", fd, fd],
     env: process.env,
@@ -242,7 +266,43 @@ export const TOOLS: Tool[] = [
       },
       required: ["goal", "cwd", "confirm"],
     },
-    call: startRun,
+    call: (a) => startRun(a),
+  },
+  {
+    name: "harness_continue",
+    description: `Pick up an earlier patchwork-harness run where it stopped (ADR-0022), in the background. If it stopped part-way (a failed or refused step, the spend ceiling, a killed process) its plan resumes from that step with no new planning. If every step finished, it follows up on what was left (a step out of tool turns, a failing test gate, an INCOMPLETE review) or on \`instruction\`. The earlier run's test gate and review carry over. SPENDS MONEY and EXECUTES TOOLS: requires confirm: true (budget default $0.50, max $${MAX_RUN_BUDGET}). Returns a session id for harness_run_status.`,
+    inputSchema: {
+      type: "object",
+      properties: {
+        cwd: { type: "string", description: "Working directory of the earlier run (Windows path)" },
+        session_id: {
+          type: "string",
+          description: "The session to continue (id or unique prefix); default the latest in cwd",
+        },
+        instruction: {
+          type: "string",
+          description:
+            "Extra guidance; on a finished run with nothing left over, the follow-up task",
+        },
+        budget_usd: { type: "number" },
+        mode: { type: "string", enum: ["budget", "balanced", "unlimited"] },
+        verify: { type: "boolean", description: "Run the L4.5 verifier at the end (default true)" },
+        verify_cmd: { type: "string", description: "Test gate; default: the earlier run's" },
+        attempts: { type: "number", description: "Repair loop on a failed gate (max 10)" },
+        checkpoint: { type: "boolean", description: "git snapshot before every step" },
+        review: {
+          description:
+            "L5 reviewer: true or a model id; default: on if the earlier run was reviewed",
+        },
+        review_fix: { type: "boolean", description: "Repair once from an INCOMPLETE L5 verdict" },
+        confirm: {
+          type: "boolean",
+          description: "Must be true: the user agreed to spend and execute",
+        },
+      },
+      required: ["cwd", "confirm"],
+    },
+    call: (a) => startRun(a, "continue"),
   },
   {
     name: "harness_run_status",
@@ -474,7 +534,7 @@ export async function handle(msg: Json): Promise<Json | null> {
       return reply({
         protocolVersion: typeof asked === "string" ? asked : PROTOCOL,
         capabilities: { tools: {} },
-        serverInfo: { name: "patchwork-harness", version: "0.3.0" },
+        serverInfo: { name: "patchwork-harness", version: "0.4.0" },
         instructions:
           "patchwork-harness is a Patchwork-audited multi-LLM coding harness. Plan with harness_plan and show the user before harness_run (which needs confirm: true and spends money). Use harness_verify_claude to audit a Claude session's answer against its tool outputs.",
       });
