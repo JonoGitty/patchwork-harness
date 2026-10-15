@@ -29,7 +29,7 @@
 #   4. routing_heuristics + anti_patterns — guard-rails for the planner
 
 corpus_metadata:
-  last_reviewed: "2026-10-15"     # evidence-based refresh (docs/research/model-probe-2026-10-15.json): Gemini 4 Argon added and verified by a real call; superseded models dropped (opus-5, sonnet-5, haiku-4-5, gpt-5.x, o3-pro, o4-mini, gemini-3.7-flash, grok-4.6) and the never-reachable gpt-6 / gpt-6-pro placeholders removed. Prior reviews 2026-10-08, 2026-09-29, 2026-09-07, 2026-08-12.
+  last_reviewed: "2026-10-15"     # evidence-based refresh (docs/research/model-probe-2026-10-15.json): Gemini 4 Argon added and verified by a real call; superseded models dropped (opus-5, sonnet-5, gpt-5.x, o3-pro, o4-mini, gemini-3.7-flash, grok-4.6; haiku-4-5 kept on request only) and the never-reachable gpt-6 / gpt-6-pro placeholders removed. Prior reviews 2026-10-08, 2026-09-29, 2026-09-07, 2026-08-12.
   next_review_due: "2027-01-15"   # 3 months — model landscape moves fast; ALSO re-run scripts/probe_models.mjs when claude-mythos-5-1 is expected to unlock, and before 1 Dec 2026 (Argon's price doubles)
   review_policy: |
     Refresh this corpus when ANY of these happen:
@@ -124,6 +124,18 @@ models:
       - "Rejects `temperature` (400 '`temperature` is deprecated', probed 8 Oct); the adapter drops it"
       - "Adaptive thinking, default effort medium; 128k output"
     typical_cost_per_step_usd: 0.001
+
+  - id: claude-haiku-4-5
+    tier: cheap_fast
+    speed: fast
+    relative_cost: low
+    best_for:
+      - "ON REQUEST ONLY: a job where the user names Haiku 4.5 (e.g. to compare against older results). The planner is never offered it"
+    avoid_for:
+      - "Everything routine: Haiku 5.5 is ten times cheaper with a 1M window"
+    quirks:
+      - "200k context, 64k output; still accepts `temperature` (the 5.x family rejects it)"
+    typical_cost_per_step_usd: 0.004
 
   - id: gpt-6-astra
     tier: flagship

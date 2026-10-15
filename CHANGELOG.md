@@ -2,6 +2,15 @@
 
 All notable changes to Patchwork Harness. Versions follow [SemVer](https://semver.org/); each release's source converts to Apache 2.0 three years after it ships (see [LICENSE](LICENSE)).
 
+## [0.4.2] — 2026-10-15
+
+### Added
+- **On-request models.** A new catalog flag, `on_request: true`, keeps a model for the rare job where you name it: `ask -m`, `--lane-model`, `review -m`, or a role list you edit. The planner is never offered it, and fallbacks never pick it.
+- **Claude Haiku 4.5** (`claude-haiku-4-5`) is back in the catalog as the first on-request model, verified by a real call on 15 Oct. Haiku 5.5 is ten times cheaper for routine work, so nothing routes to 4.5 on its own.
+
+### Fixed
+- **`models` cut every verification date to "verified …".** The column now shows the date in full, and on-request models are marked.
+
 ## [0.4.1] — 2026-10-15
 
 A model refresh. Every model below was verified by a real call, and every price comes from the vendor's pricing page.
@@ -14,7 +23,7 @@ A model refresh. Every model below was verified by a real call, and every price 
 - **Claude Haiku 5.5** (`claude-haiku-5-5`) is the planner fallback. It costs $0.10/$0.50 up to a 100k-token prompt and $0.50/$2.50 above, and the adapter applies the tier. In a planner head-to-head, the critic approved 5/12 of its first drafts against 1/12 for Haiku 4.5.
 
 ### Removed
-- **Superseded models**, each replaced by a newer model from the same vendor at the same or a lower price: `claude-opus-5`, `claude-sonnet-5`, `claude-haiku-4-5`, `gpt-5.6-sol`, `gpt-5.6-luna`, `gpt-5.5`, `gpt-5.5-pro`, `gpt-5.4-mini`, `o4-mini`, `o3-pro`, `gemini-3.7-flash` and `grok-4.6`. An old id named explicitly still prices from the adapter's table.
+- **Superseded models**, each replaced by a newer model from the same vendor at the same or a lower price: `claude-opus-5`, `claude-sonnet-5`, `claude-haiku-4-5` (back in 0.4.2, on request only), `gpt-5.6-sol`, `gpt-5.6-luna`, `gpt-5.5`, `gpt-5.5-pro`, `gpt-5.4-mini`, `o4-mini`, `o3-pro`, `gemini-3.7-flash` and `grok-4.6`. An old id named explicitly still prices from the adapter's table.
 - **The `gpt-6` and `gpt-6-pro` placeholders.** They returned 404 on every probe since 3 Sept and never appeared on OpenAI's pricing page. OpenAI ships GPT-6 as Astra, Sol and Luna.
 
 ### Fixed

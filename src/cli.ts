@@ -38,7 +38,7 @@ import { StdoutJsonReporter } from "./util/json_reporter.js";
 import { listKeys, setKey, unsetKey, envFilePath, KEY_NAMES } from "./util/key_store.js";
 import { startRepl } from "./cli/repl.js";
 
-const VERSION = "0.4.1";
+const VERSION = "0.4.2";
 
 const program = new Command();
 program
@@ -1363,6 +1363,7 @@ program
         out: m.cost_per_m_out,
         availability: m.availability,
         verified_on: m.verified_on ?? null,
+        on_request: m.on_request,
         reach: await modelReach(m),
       })),
     );
@@ -1372,12 +1373,13 @@ program
     }
     const table = new Table({
       head: [chalk.cyan("model"), chalk.cyan("provider"), chalk.cyan("$/M in"), chalk.cyan("$/M out"), chalk.cyan("catalog"), chalk.cyan("live")],
-      colWidths: [30, 12, 10, 10, 12, 14],
+      colWidths: [31, 12, 10, 10, 21, 14],
     });
     const price = (v: number | null) => (v === null ? chalk.yellow("unknown") : v.toFixed(2));
     for (const r of rows) {
       const live = r.reach === "reachable" ? chalk.green("reachable") : r.reach === "unreachable" ? chalk.red("unreachable") : chalk.yellow("unknown");
-      table.push([r.id, r.provider, price(r.in), price(r.out), r.availability === "verified" ? chalk.dim(`verified ${r.verified_on ?? ""}`) : chalk.yellow("unverified"), live]);
+      const id = r.on_request ? `${r.id} ${chalk.dim("(on request)")}` : r.id;
+      table.push([id, r.provider, price(r.in), price(r.out), r.availability === "verified" ? chalk.dim(`verified ${r.verified_on ?? ""}`) : chalk.yellow("unverified"), live]);
     }
     console.log(table.toString());
     console.log(chalk.dim(`\n  roles: ${Object.entries(cfg.defaults).map(([k, v]) => `${k}=${Array.isArray(v) ? `[${v.join(", ")}]` : v}`).join("  ")}\n`));

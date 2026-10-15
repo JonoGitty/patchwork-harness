@@ -36,6 +36,12 @@ const ModelInfo = z.object({
   verified_on: z.string().optional(),
   /** OpenAI only: models served solely by the Responses API (the -pro line). */
   api: z.enum(["chat", "responses"]).optional(),
+  /**
+   * Kept for the rare job where a user names it (`ask -m`, `--lane-model`,
+   * `review -m`, a role list they edit). Never offered to the planner and
+   * never picked as a fallback (15 Oct 2026: claude-haiku-4-5).
+   */
+  on_request: z.boolean().default(false),
   notes: z.string().optional(),
 });
 

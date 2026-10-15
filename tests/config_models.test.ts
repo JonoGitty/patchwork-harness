@@ -40,7 +40,6 @@ describe("config/models.yml (refreshed 2026-10-15)", () => {
       "gpt-6-pro",
       "claude-opus-5",
       "claude-sonnet-5",
-      "claude-haiku-4-5",
       "gpt-5.6-sol",
       "gpt-5.6-luna",
       "gpt-5.5",
@@ -95,6 +94,15 @@ describe("config/models.yml (refreshed 2026-10-15)", () => {
     expect(priceForModel("claude-opus-5-5-20260922")).toEqual({ in: 4, out: 20 });
     expect(priceForModel("gemini-3.8-flash-001")).toEqual({ in: 0.75, out: 3.75 });
     expect(priceForModel("totally-unknown")).toBeNull();
+  });
+
+  it("keeps claude-haiku-4-5 on request only, and no default role uses an on-request model (15 Oct)", () => {
+    expect(by("claude-haiku-4-5")).toMatchObject({ on_request: true, availability: "verified", verified_on: "2026-10-15" });
+    expect(by("claude-haiku-5-5")?.on_request).toBe(false);
+    const onRequest = new Set(cfg.models.filter((m) => m.on_request).map((m) => m.id));
+    const d = cfg.defaults;
+    for (const id of [d.planner, d.planner_fallback, d.executor, d.bulk_executor, d.critic, d.intent_router, ...roleList(d.reviewer), ...roleList(d.security_reviewer)])
+      expect(onRequest.has(id ?? ""), String(id)).toBe(false);
   });
 
   it("an explicitly named dropped id still prices from the adapter's fallback table", () => {

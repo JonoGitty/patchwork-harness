@@ -122,6 +122,13 @@ describe("runtime model availability", () => {
     expect(await mod.modelReach(byId("gpt-6-astra"))).toBe("unreachable");
   });
 
+  it("never falls back to an on-request model (claude-haiku-4-5 shares Haiku 5.5's tier)", async () => {
+    const alt = await mod.fallbackModelFor("claude-haiku-5-5");
+    expect(alt).not.toBeNull();
+    expect(alt?.id).not.toBe("claude-haiku-4-5");
+    expect(alt?.on_request).toBe(false);
+  });
+
   it("widens to the nearest tier when the step's own tier has only a dead vendor", async () => {
     // workhorse = Sonnet only: with every Anthropic model excluded (account out
     // of credit), a Sonnet step must still land on another vendor's model

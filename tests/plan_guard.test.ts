@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { loadModels } from "../src/config.js";
-import { enforceReachable } from "../src/core/planner.js";
+import { enforceReachable, offeredToPlanner } from "../src/core/planner.js";
 import type { Step } from "../src/core/types.js";
 
 // 28 Sept 2026: Haiku and Sonnet planned private writing onto gemma3:12b /
@@ -38,6 +38,23 @@ describe("enforceReachable (the planner may only use models it was offered)", ()
       m("gpt-6-sol"),
     );
     expect(out?.model).toBe("gpt-6-sol");
+  });
+  it("never offers an on-request model to the planner, but keeps it when a user named it", async () => {
+    const offered = offeredToPlanner(cat).map((x) => x.id);
+    expect(offered).not.toContain("claude-haiku-4-5");
+    expect(offered).toContain("claude-haiku-5-5");
+    // the direct lane / resume path checks against everything reachable, so a
+    // step the user pointed at Haiku 4.5 (`--lane-model claude-haiku-4-5`) runs as asked
+    const named = [step("claude-haiku-4-5", "anthropic")];
+    expect(await enforceReachable(named, [...reachable, m("claude-haiku-4-5")], never)).toEqual(named);
+  });
+  it("the last-resort swap skips an on-request model even when it is first in the list", async () => {
+    const [out] = await enforceReachable(
+      [step("gpt-9-imaginary", "openai")],
+      [m("claude-haiku-4-5"), m("claude-opus-5-5")],
+      never,
+    );
+    expect(out?.model).toBe("claude-opus-5-5");
   });
   it("never swaps to a fallback that is itself unreachable", async () => {
     const [out] = await enforceReachable([step("gpt-9-imaginary", "openai")], reachable, async () =>

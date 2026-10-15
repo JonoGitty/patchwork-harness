@@ -76,6 +76,15 @@ export function providerForModel(modelId: string): Provider {
  * pick falls back to the writing domain's cheap_fallback (never a flagship);
  * anything else takes the same-tier fallback.
  */
+/**
+ * What the planner may choose from: every reachable model except the
+ * `on_request` ones, which run only when a user names them. A plan that
+ * names one anyway is swapped by enforceReachable like any hidden model.
+ */
+export function offeredToPlanner(reachable: ModelInfo[]): ModelInfo[] {
+  return reachable.filter((m) => !m.on_request);
+}
+
 export async function enforceReachable(
   steps: Step[],
   reachable: ModelInfo[],
@@ -102,7 +111,8 @@ export async function enforceReachable(
         ? writingFallback.map((id) => ok.get(id)).find(Boolean)
         : undefined;
     sub ??= await fallbackFor(step.model);
-    if (!sub || !ok.has(sub.id)) sub = reachable[0] ?? null;
+    // last resort: the first reachable model, never an on-request one
+    if (!sub || !ok.has(sub.id)) sub = reachable.find((r) => !r.on_request) ?? null;
     if (!sub) {
       out.push(step);
       continue;
@@ -502,8 +512,9 @@ export async function plan(
 
   // Runtime availability: probe unverified catalog entries (cached), hide
   // whatever this key cannot reach, and say so on the audit trail.
-  const { reachable, skipped } = await reachableModels(cfg.models);
-  const hidden = new Set(skipped.map((s) => s.id));
+  const { reachable: all, skipped } = await reachableModels(cfg.models);
+  const reachable = offeredToPlanner(all);
+  const hidden = new Set([...skipped.map((s) => s.id), ...all.filter((m) => m.on_request).map((m) => m.id)]);
   if (skipped.length) {
     opts.audit?.emit({
       action: "route_decision",

@@ -289,14 +289,16 @@ export async function fallbackModelFor(
   const original = models.models.find((m) => m.id === modelId);
   const tier = tierOf.get(modelId);
   const sameTier = models.models.filter(
-    (m) => !excluded.has(m.id) && tier !== undefined && tierOf.get(m.id) === tier,
+    (m) => !excluded.has(m.id) && !m.on_request && tier !== undefined && tierOf.get(m.id) === tier,
   );
   const ordered = [
     ...sameTier.filter((m) => m.provider === original?.provider),
     ...sameTier.filter((m) => m.provider !== original?.provider),
   ];
   for (const m of ordered) if ((await modelReach(m)) === "reachable") return m;
-  const def = models.models.find((m) => m.id === models.defaults.executor && !excluded.has(m.id));
+  const def = models.models.find(
+    (m) => m.id === models.defaults.executor && !excluded.has(m.id) && !m.on_request,
+  );
   if (def && (await modelReach(def)) === "reachable") return def;
   // Nearest tier next. A tier held by one vendor (workhorse = Sonnet only)
   // left every step routed to it with NO fallback when that vendor's account
@@ -304,7 +306,7 @@ export async function fallbackModelFor(
   // Anthropic out of credit, found by the ADR-0018 eval).
   for (const t of NEAREST_TIERS[tier ?? ""] ?? NEAREST_TIERS.default!) {
     for (const m of models.models) {
-      if (excluded.has(m.id) || tierOf.get(m.id) !== t) continue;
+      if (excluded.has(m.id) || m.on_request || tierOf.get(m.id) !== t) continue;
       if ((await modelReach(m)) === "reachable") return m;
     }
   }
