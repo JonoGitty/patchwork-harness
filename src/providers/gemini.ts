@@ -75,6 +75,7 @@ function mediaToParts(media: MediaPart[]): any[] {
 // does not list. Verified against ai.google.dev/gemini-api/docs/pricing on
 // 7 Sept 2026. Longest prefix wins in priceForModel().
 const PRICING: Record<string, Price> = {
+  "gemini-4-argon": { in: 2.0, out: 10.0 }, // $4/$20 from 1 Dec 2026 (PRICE_STEPS)
   "gemini-3.8-flash": { in: 0.75, out: 3.75 }, // $1.50/$7.50 from 1 Jan 2027
   "gemini-3.7-flash": { in: 0.75, out: 3.75 },
   "gemini-3.6-flash": { in: 0.75, out: 3.75 },
@@ -84,8 +85,31 @@ const PRICING: Record<string, Price> = {
   "gemini-2.5-pro": { in: 1.25, out: 10.0 },
   "gemini-2.5-flash": { in: 0.3, out: 2.5 },
 };
-/** Extra output budget for Gemini 3.x thinking (billed as output). */
+/**
+ * Dated list-price changes the pricing page announces in advance. The catalog
+ * carries today's price; from `from` (UTC) the ledger bills `price` instead,
+ * so a run after the step is not under-counted by half. Checked against
+ * ai.google.dev/gemini-api/docs/pricing on 15 Oct 2026.
+ */
+const PRICE_STEPS: Array<{ prefix: string; from: string; price: Price }> = [
+  { prefix: "gemini-4-argon", from: "2026-12-01", price: { in: 4.0, out: 20.0 } },
+  { prefix: "gemini-3.8-flash", from: "2027-01-01", price: { in: 1.5, out: 7.5 } },
+];
+/** Extra output budget for Gemini thinking models (billed as output). */
 export const THINKING_HEADROOM_TOKENS = 16_384;
+/** Gemini 3.x and 4 think before answering; 2.x needs no headroom. */
+export const isGeminiThinkingModel = (model: string): boolean => /^gemini-([3-9]|\d{2,})/.test(model);
+/**
+ * Output caps from the models endpoint (`outputTokenLimit`). 3.x is 65,536;
+ * Gemini 4 Argon is 32,768, so the 16k answer budget plus thinking headroom
+ * would sit exactly on its cap and anything larger would 400.
+ */
+const OUTPUT_LIMIT: Record<string, number> = { "gemini-4-argon": 32_768 };
+export function geminiMaxOutputTokens(model: string, answerTokens: number): number {
+  const want = answerTokens + (isGeminiThinkingModel(model) ? THINKING_HEADROOM_TOKENS : 0);
+  const cap = Object.entries(OUTPUT_LIMIT).find(([k]) => model.startsWith(k))?.[1] ?? 65_536;
+  return Math.min(want, cap);
+}
 // Prompts over 200k input tokens bill at the long-context tier.
 const LONG_CONTEXT_TOKENS = 200_000;
 const LONG_CONTEXT: Record<string, Price> = {
@@ -93,8 +117,11 @@ const LONG_CONTEXT: Record<string, Price> = {
   "gemini-2.5-pro": { in: 2.5, out: 15.0 },
 };
 
-export function geminiCost(model: string, tIn: number, tOut: number): number | undefined {
+export function geminiCost(model: string, tIn: number, tOut: number, now: Date = new Date()): number | undefined {
   let price = priceForModel(model, PRICING);
+  for (const step of PRICE_STEPS) {
+    if (model.startsWith(step.prefix) && now >= new Date(`${step.from}T00:00:00Z`)) price = step.price;
+  }
   if (tIn > LONG_CONTEXT_TOKENS) {
     for (const [k, v] of Object.entries(LONG_CONTEXT)) if (model.startsWith(k)) price = v;
   }
@@ -265,17 +292,17 @@ export class GeminiProvider implements Provider {
       ? ([{ googleSearch: {} }] as unknown as GeminiTool[])
       : toGeminiTools(req.tools);
 
-    // Gemini 3.x thinks before it answers and the thinking is billed as
-    // output. With maxOutputTokens = the caller's answer budget, 3.1 Pro
+    // Gemini 3.x and 4 think before they answer and the thinking is billed
+    // as output. With maxOutputTokens = the caller's answer budget, 3.1 Pro
     // spent 11.5k tokens thinking and returned NO text (7 Sept 2026), so
-    // thinking models get headroom on top of the requested answer size.
-    const thinkingModel = /^gemini-3/.test(req.model);
+    // thinking models get headroom on top of the requested answer size,
+    // clamped to the model's own output cap.
     const model = client.getGenerativeModel({
       model: req.model,
       systemInstruction: systemText(req),
       tools,
       generationConfig: {
-        maxOutputTokens: (req.maxTokens ?? 4096) + (thinkingModel ? THINKING_HEADROOM_TOKENS : 0),
+        maxOutputTokens: geminiMaxOutputTokens(req.model, req.maxTokens ?? 4096),
         temperature: req.temperature,
       },
     });

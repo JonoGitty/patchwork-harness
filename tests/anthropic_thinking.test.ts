@@ -38,7 +38,7 @@ describe("Anthropic thinking blocks (Opus 5 / Fable: on by default, display omit
   });
 
   it("knows which models reject temperature", () => {
-    for (const m of ["claude-opus-5-5", "claude-opus-5", "claude-sonnet-5", "claude-fable-5-1", "claude-mythos-5-1", "claude-opus-4-8", "claude-opus-4-7"]) {
+    for (const m of ["claude-opus-5-5", "claude-opus-5", "claude-sonnet-5-5", "claude-sonnet-5", "claude-haiku-5-5", "claude-fable-5-1", "claude-mythos-5-1", "claude-opus-4-8", "claude-opus-4-7"]) {
       expect(samplingAllowed(m), m).toBe(false);
     }
     for (const m of ["claude-haiku-4-5", "claude-sonnet-4-6", "claude-opus-4-6"]) expect(samplingAllowed(m), m).toBe(true);

@@ -80,7 +80,27 @@ describe("cache-aware Anthropic cost", () => {
   it("knows the per-model cache-hit prices", () => {
     expect(cacheReadMultiplier("claude-fable-5-1")).toBe(0.025);
     expect(cacheReadMultiplier("claude-opus-5-5")).toBe(0.05);
+    expect(cacheReadMultiplier("claude-sonnet-5-5")).toBe(0.05);
     expect(cacheReadMultiplier("claude-sonnet-5")).toBe(0.1);
+    expect(cacheReadMultiplier("claude-haiku-5-5")).toBe(0.1);
+  });
+});
+
+describe("Haiku 5.5 prompt-length pricing", () => {
+  it("bills $0.10/$0.50 up to 100k prompt tokens", () => {
+    const u = { input_tokens: 100_000, output_tokens: 1_000 };
+    expect(anthropicCost("claude-haiku-5-5", u)).toBeCloseTo((100_000 * 0.1 + 1_000 * 0.5) / 1e6, 10);
+  });
+  it("bills the whole request at $0.50/$2.50 once cached + uncached input passes 100k", () => {
+    const u = { input_tokens: 1_000, cache_read_input_tokens: 100_000, output_tokens: 1_000 };
+    expect(anthropicCost("claude-haiku-5-5", u)).toBeCloseTo(
+      (1_000 * 0.5 + 100_000 * 0.5 * 0.1 + 1_000 * 2.5) / 1e6,
+      10,
+    );
+  });
+  it("leaves flat-priced models alone above 100k", () => {
+    const u = { input_tokens: 200_000, output_tokens: 0 };
+    expect(anthropicCost("claude-sonnet-5-5", u)).toBeCloseTo((200_000 * 2) / 1e6, 10);
   });
 });
 

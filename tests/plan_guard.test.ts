@@ -16,7 +16,7 @@ const step = (model: string, provider: Step["provider"], extra: Partial<Step> = 
   reason: "r",
   ...extra,
 });
-const reachable = [m("claude-haiku-4-5"), m("claude-opus-5-5"), m("gpt-6-sol")];
+const reachable = [m("claude-haiku-5-5"), m("claude-opus-5-5"), m("gpt-6-sol")];
 const never = async () => null;
 
 describe("enforceReachable (the planner may only use models it was offered)", () => {
@@ -29,7 +29,7 @@ describe("enforceReachable (the planner may only use models it was offered)", ()
   });
   it("moves a hidden local pick to the writing cheap_fallback, never a flagship, and says so", async () => {
     const [out] = await enforceReachable([step("gemma3:12b", "local")], reachable, never);
-    expect(out?.model).toBe("claude-haiku-4-5");
+    expect(out?.model).toBe("claude-haiku-5-5");
     expect(out?.provider).toBe("anthropic");
     expect(out?.reason).toContain("planner picked gemma3:12b, not available this session");
   });

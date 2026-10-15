@@ -245,9 +245,10 @@ describe("review: prompt and material", () => {
 });
 
 describe("review: the security_reviewer role", () => {
-  it("is an ordered list with unverified ids leading and three vendors present", () => {
+  it("is an ordered list with the unverified id leading and three vendors present", () => {
     const ids = roleList(loadModels().defaults.security_reviewer);
-    expect(ids.slice(0, 3)).toEqual(["gpt-6-pro", "gpt-6", "claude-mythos-5-1"]);
+    expect(ids[0]).toBe("claude-mythos-5-1"); // gpt-6 / gpt-6-pro placeholders dropped 15 Oct
+    expect(ids.indexOf("gemini-4-argon")).toBeLessThan(ids.indexOf("gemini-3.1-pro-preview"));
     const providers = new Set(
       ids.map((id) => loadModels().models.find((m) => m.id === id)?.provider),
     );

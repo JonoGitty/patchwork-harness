@@ -2,6 +2,26 @@
 
 All notable changes to Patchwork Harness. Versions follow [SemVer](https://semver.org/); each release's source converts to Apache 2.0 three years after it ships (see [LICENSE](LICENSE)).
 
+## [0.4.1] — 2026-10-15
+
+A model refresh. Every model below was verified by a real call, and every price comes from the vendor's pricing page.
+
+### Models
+- **Gemini 4 Argon** (`gemini-4-argon`) is in the catalog. It costs $2/$10 through 30 Nov 2026, then $4/$20, and the ledger bills the new price from 1 Dec. It takes 1M tokens in and 32,768 out.
+  - It leads the Google lane of `security_reviewer` and is the Google pick in `reviewer`, ahead of Gemini 3.1 Pro.
+  - On the reviewer calibration suite (once per case) it caught 8/8 planted bugs and passed 4/4 good solutions, at $0.013 a review, with no API errors.
+- **Claude Sonnet 5.5** replaces Sonnet 5 as the bulk executor and in `reviewer`. On the same suite it gave the same verdicts as Sonnet 5 (8/8 and 4/4), at $0.023 a review against $0.043.
+- **Claude Haiku 5.5** (`claude-haiku-5-5`) is the planner fallback. It costs $0.10/$0.50 up to a 100k-token prompt and $0.50/$2.50 above, and the adapter applies the tier. In a planner head-to-head, the critic approved 5/12 of its first drafts against 1/12 for Haiku 4.5.
+
+### Removed
+- **Superseded models**, each replaced by a newer model from the same vendor at the same or a lower price: `claude-opus-5`, `claude-sonnet-5`, `claude-haiku-4-5`, `gpt-5.6-sol`, `gpt-5.6-luna`, `gpt-5.5`, `gpt-5.5-pro`, `gpt-5.4-mini`, `o4-mini`, `o3-pro`, `gemini-3.7-flash` and `grok-4.6`. An old id named explicitly still prices from the adapter's table.
+- **The `gpt-6` and `gpt-6-pro` placeholders.** They returned 404 on every probe since 3 Sept and never appeared on OpenAI's pricing page. OpenAI ships GPT-6 as Astra, Sol and Luna.
+
+### Fixed
+- **Gemini 4 got no thinking headroom,** because only `gemini-3*` ids were treated as thinking models. Both now get headroom, clamped to each model's output cap, so a large request can't exceed Argon's 32,768.
+- **Haiku 5.5 had no price,** so its calls would have gone on the ledger at $0. Haiku 5.x and Sonnet 5.5 also rejected `temperature` with a 400; it is no longer sent to them.
+- **Gemini 3.8 Flash's promotional price ends on 1 Jan 2027.** The ledger bills $1.50/$7.50 from then.
+
 ## [0.4.0] — 2026-10-03
 
 ### Added

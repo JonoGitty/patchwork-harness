@@ -63,57 +63,35 @@ beforeEach(() => {
 
 describe("runtime model availability", () => {
   it("trusts verified models without a probe", async () => {
-    expect(await mod.modelReach(byId("claude-opus-5"))).toBe("reachable");
+    expect(await mod.modelReach(byId("claude-opus-5-5"))).toBe("reachable");
     expect(calls).toEqual([]);
   });
 
   it("probes an unverified model once, records a 404 as unreachable-on-key, and caches it", async () => {
-    behaviour.set("gpt-6", "404");
-    expect(await mod.modelReach(byId("gpt-6"))).toBe("unreachable");
-    expect(await mod.modelReach(byId("gpt-6"))).toBe("unreachable");
-    expect(calls).toEqual(["gpt-6"]);
+    behaviour.set("claude-mythos-5-1", "404");
+    expect(await mod.modelReach(byId("claude-mythos-5-1"))).toBe("unreachable");
+    expect(await mod.modelReach(byId("claude-mythos-5-1"))).toBe("unreachable");
+    expect(calls).toEqual(["claude-mythos-5-1"]);
     // a fresh in-memory state still finds the disk cache
     mod.resetAvailabilityCache();
-    expect(await mod.modelReach(byId("gpt-6"))).toBe("unreachable");
-    expect(calls).toEqual(["gpt-6"]);
+    expect(await mod.modelReach(byId("claude-mythos-5-1"))).toBe("unreachable");
+    expect(calls).toEqual(["claude-mythos-5-1"]);
   });
 
   it("routes to an unverified model the moment the key can reach it", async () => {
-    behaviour.set("gpt-6-pro", "ok");
-    behaviour.set("gpt-6", "404");
-    behaviour.set("claude-mythos-5-1", "404");
+    behaviour.set("claude-mythos-5-1", "ok");
     const picked = await mod.pickReachable(
-      [
-        "gpt-6-pro",
-        "gpt-6",
-        "claude-mythos-5-1",
-        "gpt-6-astra",
-        "claude-fable-5-1",
-        "gemini-3.1-pro-preview",
-      ],
+      ["claude-mythos-5-1", "gpt-6-astra", "claude-fable-5-1", "gemini-4-argon", "gemini-3.1-pro-preview"],
       { max: 3 },
     );
-    expect(picked.map((m) => m.id)).toEqual([
-      "gpt-6-pro",
-      "claude-fable-5-1",
-      "gemini-3.1-pro-preview",
-    ]);
+    expect(picked.map((m) => m.id)).toEqual(["claude-mythos-5-1", "gpt-6-astra", "gemini-4-argon"]);
+    expect(calls).toEqual(["claude-mythos-5-1"]); // only the unverified id is probed
   });
 
   it("skips unverified models silently until then (one reachable per provider)", async () => {
-    behaviour.set("gpt-6-pro", "404");
-    behaviour.set("gpt-6", "404");
     behaviour.set("claude-mythos-5-1", "404");
     const picked = await mod.pickReachable(
-      [
-        "gpt-6-pro",
-        "gpt-6",
-        "claude-mythos-5-1",
-        "gpt-6-astra",
-        "claude-fable-5-1",
-        "gemini-3.1-pro-preview",
-        "gpt-5.6-sol",
-      ],
+      ["claude-mythos-5-1", "gpt-6-astra", "claude-fable-5-1", "gemini-3.1-pro-preview", "gpt-6.1-sol"],
       { max: 3 },
     );
     expect(picked.map((m) => `${m.provider}/${m.id}`)).toEqual([
@@ -124,21 +102,21 @@ describe("runtime model availability", () => {
   });
 
   it("treats a non-404 failure as unknown (skipped this session, not cached long)", async () => {
-    behaviour.set("gpt-6", "401");
-    expect(await mod.modelReach(byId("gpt-6"))).toBe("unknown");
+    behaviour.set("claude-mythos-5-1", "401");
+    expect(await mod.modelReach(byId("claude-mythos-5-1"))).toBe("unknown");
     const { reachable, skipped } = await mod.reachableModels([
-      byId("gpt-6"),
-      byId("claude-opus-5"),
+      byId("claude-mythos-5-1"),
+      byId("claude-opus-5-5"),
     ]);
-    expect(reachable.map((m) => m.id)).toEqual(["claude-opus-5"]);
-    expect(skipped).toEqual([{ id: "gpt-6", status: "unknown" }]);
+    expect(reachable.map((m) => m.id)).toEqual(["claude-opus-5-5"]);
+    expect(skipped).toEqual([{ id: "claude-mythos-5-1", status: "unknown" }]);
   });
 
   it("finds a same-tier fallback, same provider first, and honours mid-run unreachability", async () => {
-    const alt = await mod.fallbackModelFor("gpt-6");
+    const alt = await mod.fallbackModelFor("gpt-6.1-sol");
     expect(alt?.id).toBe("gpt-6-astra"); // same provider, same tier (flagship)
     mod.markUnreachable("gpt-6-astra", "404 mid-run");
-    const alt2 = await mod.fallbackModelFor("gpt-6", ["gpt-6-astra"]);
+    const alt2 = await mod.fallbackModelFor("gpt-6.1-sol", ["gpt-6-astra"]);
     expect(alt2?.provider).toBe("openai");
     expect(alt2?.id).not.toBe("gpt-6-astra");
     expect(await mod.modelReach(byId("gpt-6-astra"))).toBe("unreachable");
@@ -147,8 +125,8 @@ describe("runtime model availability", () => {
   it("widens to the nearest tier when the step's own tier has only a dead vendor", async () => {
     // workhorse = Sonnet only: with every Anthropic model excluded (account out
     // of credit), a Sonnet step must still land on another vendor's model
-    const anthropic = ["claude-sonnet-5-5", "claude-sonnet-5", "claude-opus-5-5", "claude-opus-5", "claude-haiku-4-5", "claude-fable-5-1", "claude-mythos-5-1"];
-    const alt = await mod.fallbackModelFor("claude-sonnet-5", anthropic);
+    const anthropic = ["claude-sonnet-5-5", "claude-opus-5-5", "claude-haiku-5-5", "claude-fable-5-1", "claude-mythos-5-1"];
+    const alt = await mod.fallbackModelFor("claude-sonnet-5-5", anthropic);
     expect(alt).not.toBeNull();
     expect(alt?.provider).not.toBe("anthropic");
   });

@@ -12,6 +12,27 @@
 #                do not have access" is ambiguous - unreachable-on-this-key,
 #                never "nonexistent".
 #
+# 2026-10-15 (docs/research/model-probe-2026-10-15.json): + gemini-4-argon
+# (Gemini 4 "Argon", on the API since the 8 Oct probe; real call OK; $2/$10
+# through 30 Nov 2026, then $4/$20 - the Gemini adapter bills the step; 1M in,
+# 32,768 out, thinking). Dropped as superseded by a newer model of the same
+# vendor at the same or a lower price: claude-opus-5 (opus-5-5),
+# claude-haiku-4-5 (haiku-5-5), gpt-5.6-sol / gpt-5.5 (gpt-6.1-sol),
+# gpt-5.6-luna / gpt-5.4-mini / o4-mini (gpt-6-luna), gpt-5.5-pro / o3-pro
+# (gpt-6-astra), gemini-3.7-flash (3.8-flash), grok-4.6 (4.7), and claude-sonnet-5
+# (sonnet-5-5: same L5 verdicts at half the cost, see `reviewer`). Dropped as never
+# reachable: gpt-6 and gpt-6-pro - 404 on every probe since 3 Sept and never on
+# the pricing page; OpenAI ships GPT-6 as astra/sol/luna. The adapters keep
+# the old prices as a fallback table, so an explicitly named old id still
+# prices correctly. No new Anthropic, OpenAI or xAI model since 8 Oct.
+#
+# 2026-10-08 (docs/research/model-probe-2026-10-08.json): + claude-haiku-5-5
+# (released 7 Oct; $0.10/$0.50 up to a 100k-token prompt, $0.50/$2.50 above,
+# priced in the adapter). claude-sonnet-5-5 promoted to verified (credit back)
+# and made the bulk executor. Both reject `temperature` (400, probed today).
+# Not catalogued: Gemini 4 "Argon" (announced, not on the API or this key),
+# grok-build-0.1 (on the key but older than grok-4.7; no xAI pricing quote).
+#
 # 2026-10-02: + gpt-6.1-sol (docs/research/model-probe-2026-10-02.json). Until
 # then it fell through to the `unknown`-priced gpt-6 entry by prefix, so its
 # calls were ledgered at $0.
@@ -53,66 +74,29 @@ models:
     strengths: [hard_coding, agentic_loops, long_horizon_agentic, large_context, flagship, token_efficient]
     notes: "Released 22 Sept 2026. Cheaper than Opus 5 ($4/$20 vs $5/$25; cache hits 0.05x) with vendor-reported leads on FrontierCode 1.1 (54.4%) and Terminal-Bench 4.0 (66.4% vs Opus 5's 52.3%, Fable 5.1's 55.8%, GPT-6 Astra's 57.9%); 128k output. Rejects `temperature` (verified 28 Sept). Reported to over-think at the 'max' effort level - patchwork-harness sends no effort, so it runs at the default"
 
-  - id: claude-opus-5
-    provider: anthropic
-    context_window: 1000000
-    cost_per_m_in: 5.00
-    cost_per_m_out: 25.00
-    availability: verified
-    verified_on: "2026-09-28"
-    strengths: [hard_coding, agentic_loops, large_context, flagship]
-    notes: "Previous Opus - now the same-tier fallback for Opus 5.5, which is newer, stronger on the vendor's coding benchmarks AND 20% cheaper; 128k output"
-
   - id: claude-sonnet-5-5
     provider: anthropic
     context_window: 1000000
     cost_per_m_in: 2.00
     cost_per_m_out: 10.00
-    availability: unverified
+    availability: verified
+    verified_on: "2026-10-08"
     strengths: [coding, agentic_loops, bug_fixing, fast, balanced]
-    notes: "Released 28 Sept 2026, same price as Sonnet 5, 30%+ faster. Vendor-reported Terminal-Bench 4.0 is 70.6% (Opus 5.5 is 66.4%, Sonnet 5 10.3%) and GDPval-AA is 2 Elo behind Opus 5.5. Listed on this key on 29 Sept, but the real call failed on credit (Anthropic balance empty), so it stays unverified; the runtime probe promotes it the moment a call succeeds."
+    notes: "Released 28 Sept 2026, same price as Sonnet 5, 30%+ faster. Vendor-reported Terminal-Bench 4.0 is 70.6% (Opus 5.5 is 66.4%, Sonnet 5 10.3%) and GDPval-AA is 2 Elo behind Opus 5.5. Real call succeeded 8 Oct 2026 (it failed on credit on 29 Sept). Cache hits 0.05x ($0.10). Rejects `temperature`."
 
-  - id: claude-sonnet-5
+  - id: claude-haiku-5-5
     provider: anthropic
     context_window: 1000000
-    cost_per_m_in: 2.00
-    cost_per_m_out: 10.00
+    cost_per_m_in: 0.10
+    cost_per_m_out: 0.50
     availability: verified
-    verified_on: "2026-09-28"
-    strengths: [coding, agentic_loops, balanced, fast]
-    notes: "'The best combination of speed and intelligence'; the $2/$10 launch price is now standard"
-
-  - id: claude-haiku-4-5
-    provider: anthropic
-    context_window: 200000
-    cost_per_m_in: 1.00
-    cost_per_m_out: 5.00
-    availability: verified
-    verified_on: "2026-09-28"
-    strengths: [classification, planning, cheap_oneshot]
-    notes: "Alias of claude-haiku-4-5-20251001; 'the fastest model with near-frontier intelligence'; 64k output"
+    verified_on: "2026-10-08"
+    strengths: [classification, planning, cheap_oneshot, bulk, high_volume, large_context]
+    notes: "Released 7 Oct 2026 - 'for high-volume, latency-sensitive tasks such as classification, extraction, and routing'. $0.10/$0.50 for prompts up to 100k tokens, $0.50/$2.50 above (the adapter applies the tier; the catalog shows the base). Cache hits 0.1x. 1M ctx, 128k out, adaptive thinking (default effort medium). Rejects `temperature` (verified 8 Oct). Ten times cheaper than Haiku 4.5 and the same price as gpt-6-luna"
 
   # ── OpenAI — developers.openai.com/api/docs/pricing (28 Sept 2026; gpt-6.1-sol 2 Oct). Requests over
-  #    272k input tokens bill at the long-context tier (handled in the adapter). ──
-  - id: gpt-6-pro
-    provider: openai
-    context_window: 1000000
-    cost_per_m_in: unknown
-    cost_per_m_out: unknown
-    availability: unverified
-    api: responses
-    strengths: [hard_reasoning, security_review]
-    notes: "Not on the pricing page and 404 on this key (3 and 7 Sept 2026, every spelling). Probed each session; routed to automatically when reachable"
-
-  - id: gpt-6
-    provider: openai
-    context_window: 1000000
-    cost_per_m_in: unknown
-    cost_per_m_out: unknown
-    availability: unverified
-    strengths: [hard_reasoning, hard_coding, security_review]
-    notes: "Bare id 404s on this key; OpenAI ships the generation as gpt-6-astra (below), which does answer. Probed each session"
-
+  #    272k input tokens bill at the long-context tier (handled in the adapter). The GPT-6
+  #    generation is astra/sol/luna; bare gpt-6 / gpt-6-pro never existed on this key. ──
   - id: gpt-6-astra
     provider: openai
     context_window: 1050000
@@ -153,79 +137,19 @@ models:
     strengths: [cheap_oneshot, bulk, snippets, high_volume, classification]
     notes: "Released 22 Sept 2026 - 'our most efficient model for focused, high-volume tasks'; vendor-reported DeepSWE 66.6% at $0.10/$0.50 (the cheapest capable model in the catalog); >272k input bills $0.20/$0.75"
 
-  - id: gpt-5.6-sol
-    provider: openai
-    context_window: 1050000
-    cost_per_m_in: 4.00
-    cost_per_m_out: 20.00
+  # ── Google — ai.google.dev/gemini-api/docs/pricing (15 Oct 2026). Token limits from
+  #    the models endpoint: 1,048,576 in for every entry below; 65,536 out for 3.x,
+  #    32,768 for Gemini 4 Argon. ──
+  - id: gemini-4-argon
+    provider: gemini
+    context_window: 1048576
+    cost_per_m_in: 2.00
+    cost_per_m_out: 10.00
     availability: verified
-    verified_on: "2026-09-28"
-    strengths: [hard_coding, agentic_loops, flagship, large_context]
-    notes: "Previous generation - same-tier fallback for gpt-6-sol, which is newer at half the price"
+    verified_on: "2026-10-15"
+    strengths: [hard_reasoning, large_context, security_review, multimodal, flagship]
+    notes: "Gemini 4 'Argon' - Google's newest generation (announced before 8 Oct, on the API by 15 Oct). $2/$10 through 30 Nov 2026, then $4/$20 (the adapter applies the step); no >200k tier; implicit caching only, $0.10 then $0.20. 32,768-token output cap (half of 3.x), thinking on"
 
-  - id: gpt-5.6-luna
-    provider: openai
-    context_window: 1050000
-    cost_per_m_in: 0.20
-    cost_per_m_out: 1.20
-    availability: verified
-    verified_on: "2026-09-28"
-    strengths: [cheap_oneshot, bulk, snippets, high_volume]
-    notes: "Previous generation - same-tier fallback for gpt-6-luna, which is newer at half the price"
-
-  - id: gpt-5.5
-    provider: openai
-    context_window: 1000000
-    cost_per_m_in: 5.00
-    cost_per_m_out: 30.00
-    availability: verified
-    verified_on: "2026-09-28"
-    strengths: [hard_coding, agentic_loops, terminal_agents]
-    notes: "Previous flagship; >272k input bills $10/$45"
-
-  - id: gpt-5.5-pro
-    provider: openai
-    context_window: 1000000
-    cost_per_m_in: 30.00
-    cost_per_m_out: 180.00
-    availability: verified
-    verified_on: "2026-09-28"
-    api: responses
-    strengths: [hard_reasoning, second_opinion]
-    notes: "Responses API only (chat completions 404s); slow and 6x Astra's output price - reserve for a deliberate second opinion"
-
-  - id: gpt-5.4-mini
-    provider: openai
-    context_window: 1000000
-    cost_per_m_in: 0.75
-    cost_per_m_out: 4.50
-    availability: verified
-    verified_on: "2026-09-28"
-    strengths: [cheap_oneshot, bulk]
-
-  - id: o4-mini
-    provider: openai
-    context_window: 200000
-    cost_per_m_in: 1.10
-    cost_per_m_out: 4.40
-    availability: verified
-    verified_on: "2026-09-28"
-    strengths: [reasoning, math]
-
-  - id: o3-pro
-    provider: openai
-    context_window: 200000
-    cost_per_m_in: 20.00
-    cost_per_m_out: 80.00
-    availability: verified
-    verified_on: "2026-09-28"
-    api: responses
-    strengths: [reasoning, algorithm_review]
-    notes: "Responses API only; 13s for a 16-token reply - review, never write"
-
-  # ── Google — ai.google.dev/gemini-api/docs/pricing (7 Sept 2026). Token limits from
-  #    the models endpoint: 1,048,576 in / 65,536 out for every entry below. No new
-#    Gemini text model since 7 Sept; re-verified 28 Sept 2026. ──
   - id: gemini-3.8-flash
     provider: gemini
     context_window: 1048576
@@ -235,16 +159,6 @@ models:
     verified_on: "2026-09-28"
     strengths: [coding, agentic_loops, long_horizon_agentic, fast_flagship, multimodal]
     notes: "'Long-horizon software engineering, autonomous agents, and complex enterprise workflows'; promotional price through 31 Dec 2026, then $1.50/$7.50"
-
-  - id: gemini-3.7-flash
-    provider: gemini
-    context_window: 1048576
-    cost_per_m_in: 0.75
-    cost_per_m_out: 3.75
-    availability: verified
-    verified_on: "2026-09-28"
-    strengths: [coding, agentic_loops, multimodal]
-    notes: "'Complex coding, agentic workflows, and reliable multi-step execution'; same-tier fallback for 3.8"
 
   - id: gemini-3.1-pro-preview
     provider: gemini
@@ -275,16 +189,6 @@ models:
     verified_on: "2026-09-28"
     strengths: [recent_web, alternative_perspective, coding, self_verification]
     notes: "Released 22 Sept 2026 - xAI's 'most capable'; larger base model and longer RL for coding, long-running work and self-verification; same price as 4.6"
-
-  - id: grok-4.6
-    provider: xai
-    context_window: 500000
-    cost_per_m_in: 2.00
-    cost_per_m_out: 6.00
-    availability: verified
-    verified_on: "2026-09-28"
-    strengths: [recent_web, alternative_perspective, coding]
-    notes: "Previous Grok - same-tier fallback for grok-4.7 (same price)"
 
   - id: grok-4.3
     provider: xai
@@ -356,9 +260,9 @@ models:
 # Roles. One line of WHY each - re-decide when the catalog changes.
 defaults:
   planner: gpt-6-luna                # 28 Sept head-to-head (scripts/eval_planner.ts, 6 goals x 2): the Gemini critic approved 9/12 of its drafts vs 1/12 for Haiku; 11/12 routing rules vs 8/12; never picked a hidden model; 27% faster; 10x cheaper
-  planner_fallback: claude-haiku-4-5 # used when there is no OpenAI key
+  planner_fallback: claude-haiku-5-5 # used when there is no OpenAI key. 8 Oct re-run (docs/research/planner-eval-2026-10-08.json, 6 goals x 2): critic approved 5/12 drafts vs 1/12 for Haiku 4.5 (luna 9/12); routing 8/12 vs 9/12 (luna 10/12); 10x cheaper than 4.5
   executor: claude-opus-5-5          # 28 Sept: beats Opus 5 on every vendor-reported coding/agent benchmark AND is cheaper ($4/$20 vs $5/$25); 1M ctx, 128k out
-  bulk_executor: claude-sonnet-5     # $2/$10, 1M ctx, fast - mechanical and bulk edits
+  bulk_executor: claude-sonnet-5-5   # 8 Oct: verified on the key; same $2/$10 as Sonnet 5, 30%+ faster, cache hits half the price, vendor-reported Terminal-Bench 4.0 70.6% vs 10.3%
   critic: gemini-3.8-flash           # a DIFFERENT vendor critiques the plan; fast, $0.75/$3.75; falls back to the planner model if Gemini is off
   intent_router: gpt-6-luna          # ADR-0018: asked only when the intent head is unsure; 78.6% on 224 labelled real requests (8/8 right on patchwork-harness goals), ~2 s, ~$0.0002 a call
   # Ordered preference; `patchwork-harness review` fans out to the first REACHABLE model
@@ -375,18 +279,23 @@ defaults:
   # 16 bad-case reviews and passed all 8 good-case reviews ($0.011/review);
   # gpt-6-sol flagged all 16 bad but also 2 of the 8 good ($0.013/review). So
   # 6.1 leads; 6-sol is its fallback. Results: ~/.patchwork-harness/evals/*-l5cal.json.
+  # 15 Oct 2026, same suite, once per case (~/.patchwork-harness/evals/2026-10-15T19-42-21-908Z-l5cal.json):
+  # claude-sonnet-5-5, claude-sonnet-5 and gemini-4-argon each caught 8/8 bad
+  # and passed 4/4 good, none unparsed; per review sonnet-5-5 $0.023, sonnet-5
+  # $0.043, argon $0.013. So 5.5 replaces 5 (same verdicts, half the price) and
+  # Argon leads the Google lane ahead of 3.1 Pro (no API errors this time).
   reviewer:
     - gpt-6.1-sol                    # reviews Anthropic work (the default executor)
     - gpt-6-sol                      # if 6.1 is unreachable
-    - claude-sonnet-5                # reviews OpenAI work
-    - gemini-3.1-pro-preview         # reviews work that used both
+    - claude-sonnet-5-5              # reviews OpenAI work
+    - gemini-4-argon                 # reviews work that used both
+    - gemini-3.1-pro-preview         # if Argon is unreachable
   security_reviewer:
-    - gpt-6-pro
-    - gpt-6
-    - claude-mythos-5-1
+    - claude-mythos-5-1              # org-gated; skipped until the key can reach it
     - gpt-6-astra                    # OpenAI's most capable; $10/$50
     - claude-fable-5-1               # Anthropic's deepest reasoner; $10/$50
-    - gemini-3.1-pro-preview         # Google's heaviest reasoner; $2/$12
+    - gemini-4-argon                 # Google's newest generation; $2/$10 (from 1 Dec $4/$20)
+    - gemini-3.1-pro-preview         # Google's previous heaviest reasoner; $2/$12
     - claude-opus-5-5                # matches/beats Fable on the vendor's coding benchmarks at 40% of the price - the Anthropic fallback lane
     - gpt-6.1-sol                    # near-Astra at a fifth of the price; the L5 calibration's best (2 Oct)
     - gpt-6-sol

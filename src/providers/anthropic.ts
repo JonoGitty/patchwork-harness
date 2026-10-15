@@ -28,17 +28,28 @@ const PRICING: Record<string, Price> = {
   "claude-sonnet-5-5": { in: 2.0, out: 10.0 },
   "claude-sonnet-5": { in: 2.0, out: 10.0 },
   "claude-sonnet-4": { in: 3.0, out: 15.0 },
+  "claude-haiku-5-5": { in: 0.1, out: 0.5 },
   "claude-haiku-4-5": { in: 1.0, out: 5.0 },
+};
+
+/**
+ * Haiku 5.5 is priced by prompt length (pricing page, 8 Oct 2026): a prompt
+ * over 100k tokens - cached and uncached input together - bills every token
+ * of the request at the higher rate. Every other current model is flat.
+ */
+const LONG_PROMPT_TOKENS = 100_000;
+const LONG_PROMPT: Record<string, Price> = {
+  "claude-haiku-5-5": { in: 0.5, out: 2.5 },
 };
 
 function priceFor(model: string): Price | null {
   return priceForModel(model, PRICING);
 }
 
-/** Cache-hit price as a share of base input (vendor pricing page, 28 Sept 2026). */
+/** Cache-hit price as a share of base input (vendor pricing page, 8 Oct 2026). */
 export function cacheReadMultiplier(model: string): number {
   if (/^claude-(fable|mythos)-5-1/.test(model)) return 0.025;
-  if (/^claude-opus-5-5/.test(model)) return 0.05;
+  if (/^claude-(opus|sonnet)-5-5/.test(model)) return 0.05;
   return 0.1;
 }
 
@@ -56,10 +67,14 @@ export interface AnthropicUsage {
  * Writes bill at 1.25x (5-minute cache), reads at the model's multiplier.
  */
 export function anthropicCost(model: string, u: AnthropicUsage): number | undefined {
-  const p = priceFor(model);
+  let p = priceFor(model);
   if (!p) return undefined;
   const write = u.cache_creation_input_tokens ?? 0;
   const read = u.cache_read_input_tokens ?? 0;
+  if (totalInput(u) > LONG_PROMPT_TOKENS) {
+    const k = Object.keys(LONG_PROMPT).find((id) => model.startsWith(id));
+    if (k) p = LONG_PROMPT[k]!;
+  }
   return (
     (u.input_tokens * p.in +
       write * p.in * 1.25 +
@@ -161,10 +176,11 @@ export function fromAnthropicContent(
 
 /**
  * `temperature` / `top_p` / `top_k` were removed on the 4.7+ / 5 family
- * (400 if sent); older models still accept them.
+ * (400 if sent); older models still accept them. Haiku 5.5 and Sonnet 5.5
+ * both answered 400 "`temperature` is deprecated" on 8 Oct 2026.
  */
 export function samplingAllowed(model: string): boolean {
-  return !/^claude-(fable|mythos|opus-5|sonnet-5|opus-4-[78])/.test(model);
+  return !/^claude-(fable|mythos|opus-5|sonnet-5|haiku-5|opus-4-[78])/.test(model);
 }
 
 function toAnthropicTools(tools: ToolDef[] | undefined): Anthropic.Messages.Tool[] | undefined {

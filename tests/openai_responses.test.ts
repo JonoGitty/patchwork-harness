@@ -44,14 +44,14 @@ describe("OpenAI: Responses-API routing for the -pro line", () => {
 
 describe("OpenAI pricing", () => {
   it("uses the catalog with longest-prefix matching and the 272k long-context tier", () => {
-    expect(priceForModel("gpt-5.6-sol")).toEqual({ in: 4, out: 20 });
-    expect(priceForModel("gpt-5.6-sol-2026-08-01")).toEqual({ in: 4, out: 20 });
+    expect(priceForModel("gpt-6.1-sol")).toEqual({ in: 2, out: 10 });
+    expect(priceForModel("gpt-6.1-sol-2026-09-29")).toEqual({ in: 2, out: 10 });
     expect(openaiCost("gpt-6-astra", 100_000, 0)).toBeCloseTo(1.0, 6); // short-context tier $10/M
     expect(openaiCost("gpt-6-astra", 300_000, 1_000_000)).toBeCloseTo(6 + 75, 6); // >272k: $20/$75
-    expect(openaiCost("gpt-5.6-luna", 100_000, 100_000)).toBeCloseTo(0.14, 6);
+    expect(openaiCost("gpt-6-luna", 100_000, 100_000)).toBeCloseTo(0.06, 6);
   });
 
-  it("returns no price for models whose price is unknown in the catalog", () => {
+  it("returns no price for ids with no published price (the gpt-6 / gpt-6-pro placeholders, dropped 15 Oct)", () => {
     expect(priceForModel("gpt-6")).toBeNull();
     expect(priceForModel("gpt-6-pro")).toBeNull();
     expect(openaiCost("gpt-6-pro", 1000, 1000)).toBeUndefined();

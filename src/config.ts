@@ -15,7 +15,7 @@ import { CONFIG_DIR, HOME_HARNESS } from "./util/paths.js";
  * `unknown` parses to null; cost tracking then records no spend for that
  * model and the planner is told the price is unknown.
  */
-const Price = z
+export const Price = z
   .union([z.number(), z.literal("unknown")])
   .transform((v): number | null => (v === "unknown" ? null : v));
 

@@ -79,7 +79,7 @@ describe("Gemini 3.x thought signatures", () => {
 
 describe("Gemini pricing", () => {
   it("prices 3.8 Flash from the catalog and applies the >200k tier to 3.1 Pro", () => {
-    expect(geminiCost("gemini-3.8-flash", 1_000_000, 0)).toBeCloseTo(0.75, 6);
+    expect(geminiCost("gemini-3.8-flash", 1_000_000, 0, new Date("2026-10-15T00:00:00Z"))).toBeCloseTo(0.75, 6);
     expect(geminiCost("gemini-3.1-pro-preview", 100_000, 0)).toBeCloseTo(0.2, 6);
     expect(geminiCost("gemini-3.1-pro-preview", 300_000, 0)).toBeCloseTo(1.2, 6);
     expect(geminiCost("gemini-never-heard-of", 1000, 1000)).toBeUndefined();

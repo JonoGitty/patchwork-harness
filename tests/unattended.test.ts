@@ -173,14 +173,14 @@ describe("unattended runs never wait on a human", () => {
   });
 
   it("falls back to a same-tier model when the planned model is unreachable mid-run", async () => {
-    script.push({ throw: "The model `gpt-6` does not exist or you do not have access to it." });
+    script.push({ throw: "The model `gpt-6.1-sol` does not exist or you do not have access to it." });
     script.push({ content: [{ type: "text", text: "reviewed" }] });
     const { result, audit } = run(
       {
         title: "Review",
         description: "review it",
         provider: "openai",
-        model: "gpt-6",
+        model: "gpt-6.1-sol",
         max_tool_turns: 2,
         reason: "r",
       },
@@ -189,7 +189,7 @@ describe("unattended runs never wait on a human", () => {
     const r = await result;
     expect(r.status).toBe("completed");
     expect(r.output_summary).toBe("reviewed");
-    expect(seen.map((s) => s.model)).toEqual(["gpt-6", "gpt-6-astra"]);
+    expect(seen.map((s) => s.model)).toEqual(["gpt-6.1-sol", "gpt-6-astra"]);
     expect(r.step.model).toBe("gpt-6-astra");
     const { readFileSync } = await import("node:fs");
     const events = readFileSync(audit.pathOnDisk, "utf8");

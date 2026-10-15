@@ -20,7 +20,7 @@ import type { BudgetState } from "../src/core/budget.js";
 import { plan } from "../src/core/planner.js";
 import type { Step } from "../src/core/types.js";
 
-const PLANNERS = (process.argv[2] ?? "claude-haiku-4-5,gpt-6-luna,claude-sonnet-5").split(",");
+const PLANNERS = (process.argv[2] ?? "claude-haiku-5-5,gpt-6-luna,claude-sonnet-5-5").split(",");
 const REPS = Number(process.argv[3] ?? 2);
 
 const tierOf = new Map(loadModelCapabilities().models.map((m) => [m.id, m.tier]));

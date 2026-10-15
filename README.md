@@ -80,8 +80,10 @@ The independent reviewer agreed with the hidden check on **15 / 16** runs and fl
 | claude-sonnet-5 | 8 / 8 | 4 / 4 | 0.040 |
 | gpt-6-sol | 8 / 8 | 3 / 4 | 0.014 |
 | gpt-6-luna | 7 / 8 | 3 / 4 | 0.0007 |
+| claude-sonnet-5-5 *(15 Oct)* | 8 / 8 | 4 / 4 | 0.023 |
+| gemini-4-argon *(15 Oct)* | 8 / 8 | 4 / 4 | 0.013 |
 
-GPT-6.1 Sol was re-run against GPT-6 Sol on the same suite on 2 Oct, with each case reviewed twice. GPT-6.1 Sol flagged all 16 bad-case reviews and passed all 8 good-case reviews, at $0.011 a review. GPT-6 Sol flagged all 16 bad-case reviews too, but also flagged 2 of the 8 good ones. GPT-6.1 Sol is now the default reviewer.
+GPT-6.1 Sol was re-run against GPT-6 Sol on the same suite on 2 Oct, with each case reviewed twice. GPT-6.1 Sol flagged all 16 bad-case reviews and passed all 8 good-case reviews, at $0.011 a review. GPT-6 Sol flagged all 16 bad-case reviews too, but also flagged 2 of the 8 good ones. GPT-6.1 Sol is now the default reviewer. On 15 Oct, Claude Sonnet 5.5 matched Sonnet 5's verdicts at half the cost, so it replaced Sonnet 5. Gemini 4 Argon got every case right with no API errors, so it now leads the Google lane.
 
 Small samples. The direction matches published harness research, but the evidence is honestly thin. Run your own: `patchwork-harness eval run starter --configs baseline,gate,gate+review --trials 4`.
 

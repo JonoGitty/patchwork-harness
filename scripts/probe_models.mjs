@@ -102,7 +102,7 @@ async function probeOpenAI() {
     "gpt-5.4", "gpt-5.4-mini", "gpt-5.4-nano", "gpt-5.4-pro",
     "o3-pro", "o4-mini", "gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano",
   ];
-  const fromList = listed.filter((id) => /^(gpt-5|gpt-6|o[3-9])/.test(id) && !/realtime|audio|transcribe|tts|search|image|embed|moderation|instruct/.test(id));
+  const fromList = listed.filter((id) => /^(gpt-[5-9]|o[3-9])/.test(id) && !/realtime|audio|transcribe|tts|search|image|embed|moderation|instruct/.test(id));
   const candidates = uniq([...explicit, ...fromList]).slice(0, 60);
   const results = await pool(candidates, 5, async (model) => {
     const chat = await timed(async () => {
@@ -181,7 +181,7 @@ async function probeGemini() {
     "gemini-3.8-flash", "gemini-3.8-pro", "gemini-3.8-flash-lite", "gemini-3.5-flash", "gemini-3.5-pro", "gemini-3.5-flash-lite",
     "gemini-3.1-pro-preview", "gemini-3.1-pro", "gemini-3.1-flash-lite", "gemini-3-pro", "gemini-2.5-pro", "gemini-2.5-flash",
   ];
-  const fromList = genCapable.filter((id) => /^gemini-3/.test(id) && !/tts|image|embedding|live|audio|native/.test(id));
+  const fromList = genCapable.filter((id) => /^gemini-([3-9]|omni|pro-latest)/.test(id) && !/tts|image|embedding|live|audio|native/.test(id));
   const candidates = uniq([...explicit, ...fromList]).slice(0, 40);
   const results = await pool(candidates, 4, async (model) => {
     const r = await timed(async () => {

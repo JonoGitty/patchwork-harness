@@ -38,7 +38,7 @@ import { StdoutJsonReporter } from "./util/json_reporter.js";
 import { listKeys, setKey, unsetKey, envFilePath, KEY_NAMES } from "./util/key_store.js";
 import { startRepl } from "./cli/repl.js";
 
-const VERSION = "0.4.0";
+const VERSION = "0.4.1";
 
 const program = new Command();
 program
